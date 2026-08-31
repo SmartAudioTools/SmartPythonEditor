@@ -450,11 +450,15 @@ class HelpWidget(PluginMainWidget):
                 section=HelpWidgetOptionsMenuSections.Display,
             )
 
-        self.add_item_to_menu(
-            self.auto_import_action,
-            menu=menu,
-            section=HelpWidgetOptionsMenuSections.Other,
-        )
+        # SmartOS (patch_spyder_help_toolbar.py) : "Accueil" et le verrou, retires de la barre.
+        # Ils rejoignent "Import automatique", qui est deja un reglage du meme ordre.
+        for item in [self.home_action, self.locked_action,
+                     self.auto_import_action]:
+            self.add_item_to_menu(
+                item,
+                menu=menu,
+                section=HelpWidgetOptionsMenuSections.Other,
+            )
 
         # Plain text menu
         self._plain_text_context_menu = self.create_menu(
@@ -477,9 +481,10 @@ class HelpWidget(PluginMainWidget):
 
         # Toolbar
         toolbar = self.get_main_toolbar()
+        # SmartOS (patch_spyder_help_toolbar.py) : la barre ne garde que de quoi designer l'objet
+        # documente (source, objet). "Accueil" et le verrou sont dans le menu burger, cf. plus haut.
         for item in [self.source_label, self.source_combo, self.object_label,
-                     self.object_combo, self.object_edit, self.home_action,
-                     self.locked_action]:
+                     self.object_combo, self.object_edit]:
             self.add_item_to_toolbar(
                 item,
                 toolbar=toolbar,

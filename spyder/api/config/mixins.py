@@ -318,6 +318,36 @@ class SpyderConfigurationObserver(SpyderConfigurationAccessor):
 
     def _gather_observers(self):
         """Gather all the methods decorated with :func:`on_conf_change`."""
+        # PATCH SmartOS [SmartOS pyside611-signaux] (26/07/2026) : parcourir les CLASSES, jamais
+        # l'INSTANCE. Sous PySide6 >= 6.9, tout Signal lu pendant la construction de
+        # l'objet est definitivement mort ensuite ("Target signal has been deleted"), et
+        # cette methode est appelee depuis le constructeur de presque tout Spyder.
+        # `_conf_listen` est pose par @on_conf_change sur la FONCTION : on le lit donc
+        # dans le dictionnaire de classe, sans jamais toucher a self.
+        _vus = set()
+        for _classe in type(self).__mro__:
+            for _nom, _attribut in list(_classe.__dict__.items()):
+                if _nom in _vus:
+                    continue
+                _fonction = getattr(_attribut, "__func__", _attribut)
+                _info = getattr(_fonction, "_conf_listen", None)
+                if _info is None:
+                    continue
+                # Le plus derive gagne, comme le faisait getattr(self, nom).
+                _vus.add(_nom)
+                if len(_info) > 1:
+                    self._multi_option_listeners |= {_nom}
+                for _section, _option in _info:
+                    self._add_listener(_nom, _option, _section)
+        return
+
+        # ⚠ NE PAS SUPPRIMER CE QUI SUIT. Ce n'est pas du code mort decoratif : l'ancre
+        # remplacee INCLUT la ligne `for method_name in dir(self):`, et le corps de la
+        # boucle d'origine reste dans le fichier apres elle. Sans ce `return` suivi de la
+        # meme ligne `for`, ce corps se rattache silencieusement a la boucle precedente :
+        # le fichier compile toujours, et leve une NameError a l'execution (essaye le
+        # 26/07/2026, en croyant simplifier). Le `return` garantit qu'il n'est jamais
+        # atteint ; la ligne `for` garantit qu'il reste syntaxiquement a sa place.
         for method_name in dir(self):
             # Avoid crash at startup due to MRO
             if PYSIDE6 and method_name in {

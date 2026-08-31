@@ -255,7 +255,11 @@ qt_requirements = {
         'qtconsole>=5.7.2,<5.8.0',
     ],
     'pyside6': [
-        'pyside6>=6.5,<7',
+        # [SmartOS pyside6-deps] plage EXACTE acceptee par check_qt() (l'amont dit <7 mais refuse
+        # [SmartOS pyside6-deps] >=6.9 a l'execution) ; repli PyQt6 sur aarch64 (pas de roue PySide6).
+        'pyside6>=6.8.0,<6.9.0; platform_machine != "aarch64"',
+        'pyqt6>=6.5,<7; platform_machine == "aarch64"',
+        'pyqt6-webengine>=6.5,<7; platform_machine == "aarch64"',
         'qtconsole>=5.7.2,<5.8.0',
     ],
     'conda-forge': [
@@ -264,7 +268,7 @@ qt_requirements = {
 }
 
 # Get the proper requirements for the selected Qt binding
-install_requires = get_qt_requirements(qt_requirements, default='pyqt5')
+install_requires = get_qt_requirements(qt_requirements, default='pyside6')  # [SmartOS pyside6-deps]
 
 install_requires += [
     'aiohttp>=3.11.2',

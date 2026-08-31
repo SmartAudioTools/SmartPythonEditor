@@ -396,6 +396,36 @@ class SpyderToolbar(QToolBar):
         -------
         None
         """
+        # Boutons supprimes des barres d'outils (SmartOS, cf.
+        # Commun/scripts/patch_spyder_toolbar_trim.py) : la PREMIERE fois qu'une barre se rend, on
+        # RETIRE reellement les boutons de la liste noire de self._item_map ET de self._section_items
+        # (pas un simple masquage au rendu), puis on supprime toute section videe (pas de separateur
+        # orphelin -> aucun trou). L'action disparait de la structure de donnees : absente de tout
+        # rendu ulterieur et du menu d'extension "More". L'execution/debogage/profilage du FICHIER
+        # ("run file in <x>") et Nouveau/Ouvrir/Enregistrer restent. Blacklist indexee par self.ID.
+        if not getattr(self, "_smartos_trimmed", False):
+            self._smartos_trimmed = True
+            _blacklist = {
+                "file_toolbar": ("create_new_cell",),
+                "run_toolbar": ("run cell", "run cell and advance",
+                                "run selection and advance"),
+                "debug_toolbar": ("run cell in debugger",
+                                  "run selection in debugger"),
+                "profile_toolbar": ("run cell in profiler",
+                                    "run selection in profiler"),
+                "main_toolbar": ("show_action", "manager_action"),
+            }.get(getattr(self, "ID", None), ())
+            if _blacklist:
+                for _aid in _blacklist:
+                    self._item_map.pop(_aid, None)
+                for _sec in list(self._section_items.keys()):
+                    self._section_items[_sec] = [
+                        _it for _it in self._section_items[_sec]
+                        if getattr(_it, "action_id", None) not in _blacklist
+                    ]
+                    if not self._section_items[_sec]:
+                        self._section_items.pop(_sec)
+
         sec_items = []
         for sec, items in self._section_items.items():
             for item in items:

@@ -590,17 +590,13 @@ class PluginMainWidget(QWidget, SpyderWidgetMixin):
             shortcut_context="_",
         )
 
-        for item in [
-            self.lock_unlock_action,
-            self.undock_action,
-            self.dock_action,
-            self.close_action,
-        ]:
-            self.add_item_to_menu(
-                item,
-                self._options_menu,
-                section=OptionsMenuSections.Bottom,
-            )
+        # SmartOS (patch_spyder_dock_actions.py) : AUCUNE action de dock n'est mise dans le menu
+        # d'options des panneaux - ni "Deplacer", ni "Detacher", ni "Fermer" (demande de
+        # l'utilisateur du 26/07/2026), ni "Ancrer", qui devient une entree morte sans "Detacher" et
+        # dont l'icone flottait seule dans la gouttiere des menus qui n'en comptent aucune autre.
+        # Les quatre actions restent CREEES ci-dessus : _update_actions(), _on_top_level_change() et
+        # _on_title_bar_shown() continuent de les piloter sans rien savoir de leur emplacement.
+        # Pour fermer ou reafficher un panneau : Affichage > Panneaux.
 
         self._options_button.setMenu(self._options_menu)
         self._options_menu.aboutToShow.connect(self._update_actions)
@@ -617,6 +613,70 @@ class PluginMainWidget(QWidget, SpyderWidgetMixin):
 
         # Update title
         self.setWindowTitle(self.get_title())
+
+        # SmartOS (patch_spyder_dock_actions.py) : rangement differe du panneau - masquage du bouton
+        # burger devenu inutile et des boutons orphelins. DIFFERE d'un tour de boucle d'evenements :
+        # barres et menus propres a un panneau sont peuples par SON setup(), qui tourne apres ce
+        # _setup() de la classe de base.
+        from qtpy.QtCore import QTimer as _SmartosQTimer
+        _SmartosQTimer.singleShot(0, self._smartos_tidy_panel)
+
+    def _smartos_tidy_panel(self) -> None:
+        """
+        Deux rangements, differes en fin de construction du panneau. Cf.
+        Commun/scripts/patch_spyder_dock_actions.py.
+        """
+        self._smartos_hide_empty_options_button()
+        self._smartos_hide_orphan_toolbuttons()
+
+    def _smartos_hide_empty_options_button(self) -> None:
+        """
+        Masquer le bouton burger du panneau si son menu d'options n'a aucune entree, le montrer
+        sinon.
+        """
+        if self._options_button is None or self._options_menu is None:
+            return
+
+        # Rendu force : sans cela le menu n'a encore aucune action Qt (il n'est rendu qu'a sa
+        # premiere ouverture) et TOUS les panneaux seraient juges vides.
+        self._options_menu._dirty = True
+        self._options_menu.render()
+
+        # Un menu reduit a des separateurs compte comme vide - il ne devrait plus y en avoir depuis
+        # que render() retire ceux de fin, mais le test ne coute rien et ne depend pas de ce patch.
+        self._options_button.setVisible(
+            any(not action.isSeparator() for action in self._options_menu.actions())
+        )
+
+    def _smartos_hide_orphan_toolbuttons(self) -> None:
+        """
+        Masquer les boutons ORPHELINS du panneau : ceux que create_toolbutton() a crees mais qu'on
+        n'a ajoutes a aucune barre d'outils. Cf. l'en-tete de
+        Commun/scripts/patch_spyder_dock_actions.py pour le mecanisme et le releve.
+        """
+        from qtpy.QtWidgets import QToolButton as _SmartosQToolButton
+
+        def _geres_par_layout(layout, acc):
+            """Widgets pris en charge par ce layout, sous-layouts compris."""
+            if layout is None:
+                return acc
+            for _i in range(layout.count()):
+                _item = layout.itemAt(_i)
+                if _item is None:
+                    continue
+                _w = _item.widget()
+                if _w is not None:
+                    acc.add(_w)
+                _geres_par_layout(_item.layout(), acc)
+            return acc
+
+        # Un bouton place dans une barre d'outils a CETTE BARRE pour parent (addWidget reparente) ;
+        # un bouton place par le panneau dans son propre contenu est, lui, gere par un layout. Est
+        # donc orphelin ce qui est enfant DIRECT du panneau ET hors de tout layout.
+        _geres = _geres_par_layout(self.layout(), set())
+        for _bouton in self.findChildren(_SmartosQToolButton):
+            if _bouton.parent() is self and _bouton not in _geres:
+                _bouton.hide()
 
     def _update_actions(self) -> None:
         """

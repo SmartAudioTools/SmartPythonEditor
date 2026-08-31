@@ -124,7 +124,11 @@ class IconManager():
             'keyboard':                [('mdi.keyboard',), {'color': self.MAIN_FG_COLOR}],
             'eyedropper':              [('mdi.eyedropper',), {'color': self.MAIN_FG_COLOR}],
             'tooloptions':             [('mdi.menu',), {'color': self.MAIN_FG_COLOR}],
-            'filenew':                 [('mdi.file',), {'color': self.MAIN_FG_COLOR}],
+            # PATCH SmartOS [SmartOS icone-fichier filenew] (26/07/2026) : entree RETIREE du
+            # dictionnaire des glyphes, a dessein. icon() consultant _qtaargs AVANT le
+            # dossier d'images, c'est son ABSENCE ici qui fait servir le fichier
+            # spyder/images/{dark,light}/filenew.svg (depose par installation_SmartPythonEditor.sh
+            # depuis Commun/icones/spyder/). Cf. patch_spyder_icones_fichier.py.
             'fileopen':                [('mdi.folder-open',), {'color': self.MAIN_FG_COLOR}],
             'revert':                  [('mdi.undo',), {'color': self.MAIN_FG_COLOR}],
             'filesave':                [('mdi.content-save',), {'color': self.MAIN_FG_COLOR}],
@@ -132,9 +136,9 @@ class IconManager():
             'filesaveas':              [('mdi.content-save-edit',), {'color': self.MAIN_FG_COLOR}],
             'print':                   [('mdi.printer',), {'color': self.MAIN_FG_COLOR}],
             'fileclose':               [('mdi.close',), {'color': self.MAIN_FG_COLOR}],
-            'breakpoint_transparent':  [('mdi.checkbox-blank-circle',), {'color': SpyderPalette.COLOR_ERROR_1, 'opacity': 0.75, 'scale_factor': 0.9}],
-            'breakpoint_big':          [('mdi.checkbox-blank-circle',), {'color': SpyderPalette.ICON_4, 'scale_factor': 0.9} ],
-            'breakpoint_cond_big':     [('mdi.help-circle',), {'color': SpyderPalette.ICON_4, 'scale_factor': 0.9},],
+            'breakpoint_transparent':  [('mdi.checkbox-blank-circle',), {'color': SpyderPalette.ICON_2, 'opacity': 0.55, 'scale_factor': 0.9}],
+            'breakpoint_big':          [('mdi.checkbox-blank-circle',), {'color': SpyderPalette.ICON_2, 'scale_factor': 0.9} ],
+            'breakpoint_cond_big':     [('mdi.help-circle',), {'color': SpyderPalette.ICON_2, 'scale_factor': 0.9},],
             'breakpoints':             [('mdi.dots-vertical',), {'color': self.MAIN_FG_COLOR}],
             'arrow_debugger':          [('mdi.arrow-right-bold',), {'color': SpyderPalette.ICON_2, 'scale_factor': 1.5}],
             'arrow-step-over':         [('mdi.debug-step-over',), {'color': SpyderPalette.ICON_2}],

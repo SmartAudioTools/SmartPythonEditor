@@ -321,6 +321,13 @@ class StatusBarWidget(QWidget, SpyderWidgetMixin):
 
         self.sig_clicked.emit()
 
+        # Menu ouvert : fond transparent (SmartOS). Cf.
+        # Commun/scripts/patch_spyder_status_reset.py : le popup capture la souris, donc leaveEvent
+        # ne se declenchera pas et le fond resterait au gris de survol : on le remet transparent.
+        if self.INTERACT_ON_CLICK and self.menu:
+            self._css.QWidget.setValues(backgroundColor="transparent")
+            self.setStyleSheet(self._css.toString())
+
     def enterEvent(self, event: QEnterEvent) -> None:
         """
         Change the widget's background color and cursor shape on hover.
@@ -367,6 +374,13 @@ class StatusBarWidget(QWidget, SpyderWidgetMixin):
             self.setCursor(Qt.ArrowCursor)
 
         super().leaveEvent(event)
+
+        # Fond transparent au repos (SmartOS). Cf. Commun/scripts/patch_spyder_status_reset.py :
+        # plutot que COLOR_BACKGROUND_4, qui forme une tache claire depuis que la barre de statut
+        # est sur le fond sombre de l'editeur (cf. patch_spyder_colors.py).
+        if self.INTERACT_ON_CLICK:
+            self._css.QWidget.setValues(backgroundColor="transparent")
+            self.setStyleSheet(self._css.toString())
 
 
 class BaseTimerStatus(StatusBarWidget):

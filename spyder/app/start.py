@@ -28,6 +28,9 @@ import os.path as osp
 import random
 import socket
 import time
+import setproctitle
+
+setproctitle.setproctitle('spyder')
 import warnings
 
 # Prevent showing internal logging errors

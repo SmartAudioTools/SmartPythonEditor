@@ -73,6 +73,9 @@ class PylintWidgetActions:
 
 
 class PylintWidgetOptionsMenuSections:
+    # SmartOS (patch_spyder_pylint_toolbar.py) : section du bouton "Sortie", deplace de la barre
+    # secondaire vers le menu burger.
+    Output = "output_section"
     Global = "global_section"
     Section = "section_section"
     History = "history_section"
@@ -304,6 +307,21 @@ class PylintWidget(PluginMainWidget):
     level.
     """
 
+    # PATCH SmartOS [SmartOS signal-fin-analyse-declaration] (26/07/2026)
+    sig_analysis_finished = Signal(str)
+    """
+    Emis quand une analyse pylint vient de se terminer et que ses resultats sont ranges.
+
+    Permet a un autre greffon de reporter ces resultats ailleurs - ici, dans la marge de l'editeur
+    (greffon spyder_code_analysis), afin que pylint ne tourne qu'UNE fois pour les deux affichages.
+
+    Parameters
+    ----------
+    filename: str
+        Fichier analyse. Indispensable : au moment de l'emission, l'utilisateur peut avoir change
+        d'onglet. Les resultats se lisent ensuite par get_data(filename), API publique deja la.
+    """
+
     def __init__(self, name=None, plugin=None, parent=None):
         super().__init__(name, plugin, parent)
 
@@ -427,6 +445,12 @@ class PylintWidget(PluginMainWidget):
         self.show_data(justanalyzed=True)
         self.update_actions()
         self.stop_spinner()
+
+        # PATCH SmartOS [SmartOS signal-fin-analyse-emission] (26/07/2026) : prevenir qui veut que
+        # l'analyse est terminee et ses resultats ranges. Emis ICI, et non dans set_data(), qui est
+        # aussi appele a la restauration de l'historique - le signal partirait alors sans qu'aucune
+        # analyse n'ait tourne.
+        self.sig_analysis_finished.emit(filename)
 
     def _check_new_file(self):
         fname = self.get_filename()
@@ -553,14 +577,41 @@ class PylintWidget(PluginMainWidget):
         )
         self.treewidget.restore_action.setVisible(False)
 
+        # SmartOS (3e passe, 26/07/2026) : la barre principale est videe (demande de
+        # l'utilisateur). Le COMBO de choix du fichier n'a plus de raison d'etre - le fichier analyse
+        # est celui ouvert dans l'editeur, que le greffon Pylint suit deja par
+        # sig_editor_focus_changed -> set_filename(). Et "Demarrer l'analyse de code" fait doublon
+        # avec le bouton "Docteur" de la barre d'outils du haut (greffon spyder_code_analysis).
+        #
+        # ⚠ LE COMBO EST MASQUE, PAS SUPPRIME, et les deux raisons comptent :
+        #   - il PORTE L'ETAT : get_filename() lit son texte courant, set_filename() l'y ecrit,
+        #     _update_combobox_history() y tient l'historique des fichiers analyses, et sa validite
+        #     pilote l'activation de l'action (filecombo.valid -> setEnabled). Le retirer casserait
+        #     tout le panneau ;
+        #   - un widget retire d'une barre d'outils RESTE AFFICHE chez son parent, a l'origine du
+        #     panneau et a sa taille par defaut - le piege des boutons orphelins, paye le matin meme
+        #     sur trois panneaux. D'ou le hide() explicite : il ne suffit pas de ne plus l'ajouter.
+        #     Le filet de patch_spyder_dock_actions.py ne couvre que les QToolButton, pas un combo.
         toolbar = self.get_main_toolbar()
-        for item in [self.filecombo, self.browse_action,
-                     self.code_analysis_action]:
-            self.add_item_to_toolbar(
-                item,
-                toolbar,
-                section=PylintWidgetMainToolbarSections.Main,
-            )
+        self.filecombo.hide()
+
+        # SmartOS (patch_spyder_pylint_toolbar.py) : "Sortie" (sortie brute de pylint) quitte la
+        # barre secondaire - purement informative : note et date de la derniere analyse - pour le
+        # menu burger, en tete (before_section, donc avant les replier/deplier). Les deux
+        # etirements restent : la date demeure centree comme avant.
+        self.add_item_to_menu(
+            self.log_action,
+            menu=options_menu,
+            section=PylintWidgetOptionsMenuSections.Output,
+            before_section=PylintWidgetOptionsMenuSections.Global,
+        )
+
+        # SmartOS (2e passe, 26/07/2026) : le bouton "parcourir" retire de la barre principale.
+        self.add_item_to_menu(
+            self.browse_action,
+            menu=options_menu,
+            section=PylintWidgetOptionsMenuSections.Output,
+        )
 
         secondary_toolbar = self.create_toolbar("secondary")
         for item in [self.ratelabel,
@@ -568,13 +619,41 @@ class PylintWidget(PluginMainWidget):
                          id_=PylintWidgetToolbarItems.Stretcher1),
                      self.datelabel,
                      self.create_stretcher(
-                         id_=PylintWidgetToolbarItems.Stretcher2),
-                     self.log_action]:
+                         id_=PylintWidgetToolbarItems.Stretcher2)]:
             self.add_item_to_toolbar(
                 item,
                 secondary_toolbar,
                 section=PylintWidgetMainToolbarSections.Main,
             )
+
+        # SmartOS (4e passe, 26/07/2026) : la barre de coin rejoint la ligne de la note. Demande de
+        # l'utilisateur : « je veux le menu burger du panneau sur la meme ligne que Evaluation
+        # globale et la date ». Le panneau occupait DEUX lignes pour rien depuis que la 3e passe a
+        # vide la barre principale : la premiere ne portait plus que le burger.
+        #
+        # ⚠ ON DEPLACE DES BARRES, PAS LEUR CONTENU, et c'est tout le point. Deux voies ont ete
+        # essayees et ECHOUENT, a ne pas refaire :
+        #   - deplacer le WIDGET DE COIN dans la barre secondaire par addWidget() : le widget change
+        #     bien de parent, mais reste INVISIBLE meme avec un setVisible(True) explicite.
+        #     addWidget() cree une QWidgetAction qui POSSEDE le widget ; l'ajouter a une seconde
+        #     barre fait relacher le widget par la premiere, ce qui le masque ;
+        #   - mettre la note et la date dans la barre PRINCIPALE et ne plus creer la secondaire :
+        #     SPYDER NE DEMARRE PLUS (TypeError dans pixelMetric au rendu des barres d'APPLICATION).
+        # Ici on ne touche ni aux QWidgetAction ni aux items : on prend les deux BARRES, objets
+        # ordinaires, et on les met cote a cote dans un layout horizontal. Ajouter un widget a un
+        # layout le retire automatiquement du precedent.
+        #
+        # ⚠ ET ON N'EN CREE MEME PAS : la ligne horizontale existe DEJA. `_main_toolbar_layout`
+        # (api/widgets/main_widget.py) porte la barre principale, avec un etirement de 10000, puis la
+        # barre de coin avec 1 - c'est-a-dire exactement la disposition voulue, burger colle a droite.
+        # Il suffit donc d'y INSERER la barre secondaire en tete et de masquer la barre principale,
+        # vide depuis la 3e passe. Deux lignes, aucun layout a construire, aucun import a ajouter.
+        # (Une premiere version creait son propre QHBoxLayout et importait QHBoxLayout dans ce fichier
+        # amont : meme resultat mesure, mais six lignes et un import de plus.)
+        #
+        # Les deux etirements de la barre secondaire sont intacts : la date reste centree.
+        self._main_toolbar_layout.insertWidget(0, secondary_toolbar, stretch=10000)
+        self.get_main_toolbar().setVisible(False)
 
         self.show_data()
 

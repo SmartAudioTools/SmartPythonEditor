@@ -50,6 +50,9 @@ class VariableExplorerWidgetActions:
 
 
 class VariableExplorerWidgetOptionsMenuSections:
+    # SmartOS (patch_spyder_varexp_toolbar.py) : section des actions de donnees (Importer /
+    # Enregistrer / Enregistrer sous), deplacees de la barre d'outils vers le menu burger.
+    Data = 'data_section'
     Display = 'excludes_section'
     Highlight = 'highlight_section'
     Resize = 'resize_section'
@@ -294,7 +297,24 @@ class VariableExplorerWidget(ShellConnectMainWidget):
 
         # Options menu
         options_menu = self.get_options_menu()
-        for item in [self.exclude_private_action,
+
+        # SmartOS (patch_spyder_varexp_toolbar.py) : Importer / Enregistrer / Enregistrer sous
+        # quittent la barre d'outils pour cette section, placee en tete du menu (les sections sont
+        # rendues dans leur ordre de premiere utilisation). Ce sont des actions rares - echanger un
+        # espace de noms avec un fichier .spydata - qui occupaient trois icones en permanence.
+        # SmartOS (2e passe, 26/07/2026) : "Supprimer toutes les variables" les rejoint.
+        for item in [import_data_action, save_action, save_as_action,
+                     reset_namespace_action]:
+            self.add_item_to_menu(
+                item,
+                menu=options_menu,
+                section=VariableExplorerWidgetOptionsMenuSections.Data,
+            )
+
+        # SmartOS (3e passe, 26/07/2026) : le filtre, juste au-dessus des cinq exclusions
+        # qu'il grise ou degrise (cf. _enable_filter_actions).
+        for item in [self.filter_button,
+                     self.exclude_private_action,
                      self.exclude_uppercase_action,
                      self.exclude_capitalized_action,
                      self.exclude_unsupported_action,
@@ -317,14 +337,14 @@ class VariableExplorerWidget(ShellConnectMainWidget):
             )
 
         # Main toolbar
+        # SmartOS (2e passe, 26/07/2026) : la barre principale est desormais VIDE - "Supprimer
+        # toutes les variables", destructrice et rare, a rejoint le menu burger avec les autres.
+        # ⚠ On la LAISSE en place sans la masquer : elle partage sa rangee avec la barre de COIN
+        # (Rechercher, Filtre, Rafraichir), qui reste. La rangee existe donc de toute facon - aucune
+        # hauteur a gagner - et c'est l'etirement de cette barre (stretch 10000 dans
+        # PluginMainWidget._setup) qui pousse les boutons du coin a droite : la masquer les ferait
+        # retomber a gauche.
         main_toolbar = self.get_main_toolbar()
-        for item in [import_data_action, save_action, save_as_action,
-                     reset_namespace_action]:
-            self.add_item_to_toolbar(
-                item,
-                toolbar=main_toolbar,
-                section=VariableExplorerWidgetMainToolBarSections.Main,
-            )
         save_action.setEnabled(False)
 
         # Search, Filter and Refresh buttons are added in _setup()
@@ -449,7 +469,11 @@ class VariableExplorerWidget(ShellConnectMainWidget):
 
         self.filter_button = self.create_action(
             VariableExplorerWidgetActions.ToggleFilter,
-            text="",
+            # SmartOS (3e passe, 26/07/2026) : Libelle du bouton de filtre dans le MENU burger, ou
+            # il est desormais - une icone suffisait tant qu'il etait dans la barre de coin, mais
+            # une entree de menu sans texte serait vide. _("Filter variables") est deja son
+            # infobulle, et deja traduit ("Filtrer les variables") : rien a ajouter au catalogue.
+            text=_("Filter variables"),
             icon=ima.icon('filter'),
             toggled=self._enable_filter_actions,
             option='filter_on',
@@ -458,9 +482,10 @@ class VariableExplorerWidget(ShellConnectMainWidget):
         self.filter_button.setCheckable(True)
         self.filter_button.toggled.connect(self._set_filter_button_state)
 
+        # SmartOS (3e passe, 26/07/2026) : le filtre part dans le menu burger, juste au-dessus
+        # des exclusions qu'il commande. Le coin garde "Rechercher" et "Rafraichir".
         for action in [
             self.search_action,
-            self.filter_button,
             self.refresh_action,
         ]:
             self.add_corner_widget(action, before=self._options_button)
@@ -709,6 +734,17 @@ class VariableExplorerWidget(ShellConnectMainWidget):
         main_toolbar = self.get_main_toolbar()
         for action in main_toolbar.actions():
             action.setEnabled(enabled)
+
+        # SmartOS (patch_spyder_varexp_toolbar.py) : Importer / Enregistrer / Enregistrer sous ont
+        # quitte la barre pour le menu burger. La boucle ci-dessus, qui grise toute la barre quand
+        # la console courante est morte (message d'erreur), ne les atteint donc plus : on les grise
+        # explicitement, sinon elles resteraient cliquables sur une console inexistante.
+        # update_actions() affine ensuite l'etat de SaveData selon nsb.filename, comme avant.
+        for action_id in [VariableExplorerWidgetActions.ImportData,
+                          VariableExplorerWidgetActions.SaveData,
+                          VariableExplorerWidgetActions.SaveDataAs,
+                          VariableExplorerWidgetActions.ResetNamespace]:
+            self.get_action(action_id).setEnabled(enabled)
 
         # Adjustments for the filter button
         if enabled:

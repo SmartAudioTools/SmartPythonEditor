@@ -50,7 +50,25 @@ class StatusBarConfigPage(PluginConfigPage):
         sbar_layout.addLayout(cpu_memory_layout)
         sbar_group.setLayout(sbar_layout)
 
+        # Activation par widget (SmartOS, patch_spyder_statusbar_enable.py) : une case par
+        # widget de la barre d'etat. Decoche par defaut (l'overlay par editeur reprend
+        # ligne/colonne/encodage/fin de ligne). Chaque case pilote statusbar/<ID>/enable.
+        widgets_group = QGroupBox(_("Widgets individuels de la barre d'etat"))
+        smartos_box_0 = newcb(_("Position du curseur (ligne, colonne)"), 'cursor_position_status/enable')
+        smartos_box_1 = newcb(_("Encodage du fichier"), 'encoding_status/enable')
+        smartos_box_2 = newcb(_("Type de fin de ligne"), 'eol_status/enable')
+        smartos_box_3 = newcb(_("Branche de controle de version (Git)"), 'vcs_status/enable')
+        smartos_box_4 = newcb(_("Etat du serveur de langage (LSP)"), 'lsp_status/enable')
+        smartos_box_5 = newcb(_("Indicateur lecture seule / ecriture"), 'read_write_status/enable')
+        smartos_box_6 = newcb(_("Interpreteur Python de la console"), 'pythonenv_status/enable')
+        smartos_box_7 = newcb(_("Backend graphique Matplotlib"), 'matplotlib_status/enable')
+        widgets_layout = QVBoxLayout()
+        for _b in (smartos_box_0, smartos_box_1, smartos_box_2, smartos_box_3, smartos_box_4, smartos_box_5, smartos_box_6, smartos_box_7):
+            widgets_layout.addWidget(_b)
+        widgets_group.setLayout(widgets_layout)
+
         vlayout = QVBoxLayout()
         vlayout.addWidget(sbar_group)
+        vlayout.addWidget(widgets_group)
         vlayout.addStretch(1)
         self.setLayout(vlayout)

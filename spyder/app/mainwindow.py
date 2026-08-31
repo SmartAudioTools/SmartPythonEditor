@@ -33,6 +33,7 @@ import socket
 import sys
 import threading
 import traceback
+import subprocess
 
 #==============================================================================
 # Check requirements before proceeding
@@ -51,6 +52,7 @@ from qtpy.QtWidgets import (
 
 # Avoid a "Cannot mix incompatible Qt library" error on Windows platforms
 from qtpy import QtSvg  # analysis:ignore
+from qtpy.QtGui import QMoveEvent as _SmartosQMoveEvent, QResizeEvent as _SmartosQResizeEvent  # PATCH SmartOS [SmartOS pyside611-signaux-evenements]
 
 # Avoid a bug in Qt: https://bugreports.qt.io/browse/QTBUG-46720
 try:
@@ -135,8 +137,8 @@ class MainWindow(QMainWindow, SpyderMainWindowMixin, SpyderShortcutsMixin):
     restore_scrollbar_position = Signal()
     sig_setup_finished = Signal()
     sig_open_external_file = Signal(str)
-    sig_resized = Signal("QResizeEvent")
-    sig_moved = Signal("QMoveEvent")
+    sig_resized = Signal(_SmartosQResizeEvent)
+    sig_moved = Signal(_SmartosQMoveEvent)
     sig_layout_setup_ready = Signal(object)  # Related to default layouts
 
     sig_window_state_changed = Signal(object)
@@ -876,7 +878,8 @@ class MainWindow(QMainWindow, SpyderMainWindowMixin, SpyderShortcutsMixin):
 
             # Connect the window to the signal emitted by the previous server
             # when it gets a client connected to it
-            self.sig_open_external_file.connect(self.open_external_file)
+            self.sig_open_external_file.connect(
+                self._raise_and_open_external_file)
 
         # Reopen last session if no project is active
         # NOTE: This needs to be after the calls to on_mainwindow_visible
@@ -895,6 +898,118 @@ class MainWindow(QMainWindow, SpyderMainWindowMixin, SpyderShortcutsMixin):
         # Notify that the setup of the mainwindow was finished
         self.is_setting_up = False
         self.sig_setup_finished.emit()
+
+        # Ajout SmartOS (_smartos_run_file) : --run-file <script> ouvre le fichier et
+        # l'execute, comme un F5, sans qu'aucune frappe soit necessaire. Sert a tester
+        # automatiquement les greffons qui affichent le resultat d'une execution (Pyxel).
+        # Cf. Commun/scripts/patch_spyder_run_file.py
+        _smartos_target = getattr(self._cli_options, 'run_file', None)
+        if _smartos_target:
+            from qtpy.QtCore import QTimer as _SmartosTimer
+
+            def _smartos_run_file():
+                try:
+                    from spyder.api.plugins import Plugins as _SmartosPlugins
+
+                    editor = self.get_plugin(_SmartosPlugins.Editor, error=False)
+                    if editor is not None:
+                        editor.load(_smartos_target)
+                    console = self.get_plugin(
+                        _SmartosPlugins.IPythonConsole, error=False)
+                    if console is not None:
+                        # runfile() est la fonction que Spyder utilise lui-meme pour F5 :
+                        # meme repertoire de travail, meme espace de noms.
+                        console.execute_code(
+                            "runfile({!r}, wdir={!r})".format(
+                                _smartos_target,
+                                __import__('os').path.dirname(_smartos_target)))
+                except Exception:
+                    # Une option de confort ne doit jamais empecher Spyder de s'ouvrir.
+                    import traceback
+                    traceback.print_exc()
+
+            # La console termine le demarrage de son noyau dans la boucle d'evenements :
+            # on lui laisse le temps plutot que d'appeler immediatement.
+            _SmartosTimer.singleShot(8000, _smartos_run_file)
+
+        # Ajout SmartOS (_smartos_profile_file) : --profile-file <script> ouvre le fichier et
+        # lance le run du Line Profiler (profilage combine cProfile + lignes), sans frappe.
+        # Sert a tester le profilage combine en autonomie. Cf.
+        # Commun/scripts/patch_spyder_profile_file.py
+        _smartos_prof_target = getattr(self._cli_options, 'profile_file', None)
+        if _smartos_prof_target:
+            from qtpy.QtCore import QTimer as _SmartosProfTimer
+
+            def _smartos_profile_file():
+                try:
+                    import os as _smartos_os
+                    from spyder.api.plugins import Plugins as _SmartosPlugins
+
+                    editor = self.get_plugin(_SmartosPlugins.Editor, error=False)
+                    if editor is not None:
+                        editor.load(_smartos_prof_target)
+                    lp = self.get_plugin('spyder_line_profiler', error=False)
+                    if lp is not None:
+                        lp.get_widget().analyze(
+                            _smartos_prof_target,
+                            wdir=_smartos_os.path.dirname(_smartos_prof_target))
+                except Exception:
+                    # Une option de test ne doit jamais empecher Spyder de s'ouvrir.
+                    import traceback
+                    traceback.print_exc()
+
+            # La console termine le demarrage de son noyau dans la boucle d'evenements : on lui
+            # laisse le temps (un peu plus que --run-file, le profilage lancant un sous-processus).
+            _SmartosProfTimer.singleShot(10000, _smartos_profile_file)
+
+        # Ajout SmartOS (_smartos_gui_exec) : --gui-exec <script> execute le script DANS le
+        # processus GUI (contrairement a --run-file, qui tourne dans le noyau IPython separe),
+        # avec acces a `main` (self) et `app`. Sert a inspecter/piloter les plugins en
+        # autonomie. Cf. Commun/scripts/patch_spyder_gui_exec.py
+        _smartos_gui_exec_target = getattr(self._cli_options, 'gui_exec', None)
+        if _smartos_gui_exec_target:
+            from qtpy.QtCore import QTimer as _SmartosGuiExecTimer
+            from qtpy.QtWidgets import QApplication as _SmartosGuiExecApp
+
+            def _smartos_gui_exec():
+                try:
+                    with open(_smartos_gui_exec_target, encoding='utf-8') as _f:
+                        _code = _f.read()
+                    exec(compile(_code, _smartos_gui_exec_target, 'exec'), {
+                        'main': self,
+                        'app': _SmartosGuiExecApp.instance(),
+                        '__name__': '__main__',
+                    })
+                except Exception:
+                    # Une option de test ne doit jamais empecher Spyder de s'ouvrir.
+                    import traceback
+                    traceback.print_exc()
+
+            _SmartosGuiExecTimer.singleShot(3000, _smartos_gui_exec)
+
+        # Ajout SmartOS (_smartos_actions) : --actions <scenario.json> joue une suite d'actions
+        # dans le processus GUI, en scrutant par QTimer (donc SANS bloquer la boucle
+        # d'evenements : une attente qui la bloquerait empecherait ce qu'elle attend d'arriver).
+        # Toute la logique est dans le module smartos_spyder_actions, depose a cote de Spyder.
+        # Cf. Commun/scripts/patch_spyder_actions.py
+        _smartos_actions_target = getattr(self._cli_options, 'actions', None)
+        if _smartos_actions_target:
+            from qtpy.QtCore import QTimer as _SmartosActionsTimer
+            from qtpy.QtWidgets import QApplication as _SmartosActionsApp
+
+            def _smartos_actions_demarrer():
+                try:
+                    import smartos_spyder_actions as _smartos_actions_moteur
+                    _smartos_actions_moteur.demarrer(
+                        self, _SmartosActionsApp.instance(), _smartos_actions_target)
+                except Exception:
+                    # Une option de test ne doit jamais empecher Spyder de s'ouvrir.
+                    import traceback
+                    traceback.print_exc()
+
+            # Court : le moteur a sa propre temporisation d'amorcage ("depart" du scenario),
+            # reglable par scenario - c'est la qu'on attend le noyau, pas ici.
+            _SmartosActionsTimer.singleShot(500, _smartos_actions_demarrer)
 
     def reopen_last_session(self):
         """
@@ -957,6 +1072,21 @@ class MainWindow(QMainWindow, SpyderMainWindowMixin, SpyderShortcutsMixin):
 
         self.base_title = title
         self.setWindowTitle(self.base_title)
+
+        # Chemin du fichier actif dans le titre de la fenetre (ajout SmartOS, cf.
+        # Commun/scripts/patch_spyder_window_title.py) - remplace la barre de chemin au-dessus des
+        # onglets, masquee par l'option "editor/show_filename_toolbar".
+        editor = self.get_plugin(Plugins.Editor, error=False)
+        if editor is not None:
+            if not getattr(self, '_smartos_title_connected', False):
+                # Reappelle set_window_title a chaque changement d'onglet / ouverture de fichier.
+                editor.sig_editor_focus_changed.connect(self.set_window_title)
+                self._smartos_title_connected = True
+
+            filename = editor.get_current_filename()
+            if filename:
+                self.base_title = u'Spyder - {}'.format(filename)
+                self.setWindowTitle(self.base_title)
 
     # TODO: To be removed after all actions are moved to their corresponding
     # plugins
@@ -1172,6 +1302,31 @@ class MainWindow(QMainWindow, SpyderMainWindowMixin, SpyderShortcutsMixin):
     def get_initial_working_directory(self):
         """Return the initial working directory."""
         return self.INITIAL_CWD
+
+    def _raise_and_open_external_file(self, fname):
+        """
+        Ramene la fenetre au premier plan puis ouvre fname (TODO CachyOS du 18/07/2026, "Pb spyder
+        qui ne se remet pas au 1er plan si deja ouvert"). Cf. docstring de
+        patch_spyder_raise_window.py pour le contexte complet - branchee uniquement sur le signal
+        emis par le serveur socket (deuxieme invocation de Spyder), pas sur le premier lancement.
+        """
+        if shutil.which('kdotool'):
+            try:
+                subprocess.run(
+                    ['kdotool', 'search', '--class', 'spyder', 'windowactivate'],
+                    timeout=2, check=False,
+                )
+            except OSError:
+                pass
+        else:
+            self.setWindowState(
+                (self.windowState() & ~Qt.WindowMinimized) | Qt.WindowActive
+            )
+            self.show()
+            self.raise_()
+            self.activateWindow()
+            QApplication.alert(self)
+        self.open_external_file(fname)
 
     def open_external_file(self, fname):
         """

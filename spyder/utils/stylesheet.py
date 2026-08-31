@@ -24,6 +24,21 @@ from spyder.config.gui import is_dark_interface
 from spyder.utils.palette import SpyderPalette
 
 
+def smartos_editor_background():
+    """Couleur de fond de l'editeur de texte (fond du theme de coloration syntaxique actif).
+
+    Ajout SmartOS (cf. Commun/scripts/patch_spyder_colors.py) : sert a aligner la barre d'outils
+    principale et les separateurs de docks sur l'editeur. Import local pour ne pas creer d'import
+    circulaire avec spyder.config.manager au chargement de ce module.
+    """
+    try:
+        from spyder.config.gui import get_color_scheme
+        from spyder.config.manager import CONF
+        return get_color_scheme(CONF.get('appearance', 'selected'))['background']
+    except Exception:
+        return SpyderPalette.COLOR_BACKGROUND_1
+
+
 # =============================================================================
 # ---- Constants
 # =============================================================================
@@ -343,6 +358,21 @@ class AppStylesheet(SpyderStyleSheet, SpyderConfigurationAccessor):
             padding=f"{AppStyle.MarginSize - 1}px 0px",
         )
 
+        # Barre de statut a la couleur de fond de l'editeur (ajout SmartOS, cf.
+        # Commun/scripts/patch_spyder_colors.py), comme la barre d'outils et les separateurs.
+        smartos_background = smartos_editor_background()
+        css.QStatusBar.setValues(
+            background=smartos_background,
+            backgroundColor=smartos_background,
+            border=f'1px solid {smartos_background}',
+        )
+
+        # Separateurs de docks a la couleur de fond de l'editeur (ajout SmartOS, cf.
+        # Commun/scripts/patch_spyder_colors.py). L'etat :hover reste volontairement distinct.
+        css['QMainWindow::separator'].setValues(
+            backgroundColor=smartos_editor_background()
+        )
+
 
 APP_STYLESHEET = AppStylesheet()
 
@@ -388,6 +418,12 @@ class ApplicationToolbarStylesheet(SpyderStyleSheet):
         # Remove indicator for popup mode
         css['QToolBar QToolButton::menu-indicator'].setValues(
             image='none'
+        )
+
+        # Barre d'outils principale a la couleur de fond de l'editeur (ajout SmartOS, cf.
+        # Commun/scripts/patch_spyder_colors.py) au lieu de COLOR_BACKGROUND_4.
+        css.QToolBar.setValues(
+            backgroundColor=smartos_editor_background()
         )
 
 

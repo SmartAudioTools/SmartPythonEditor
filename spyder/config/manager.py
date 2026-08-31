@@ -18,8 +18,6 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 import weakref
 
 # Third-party imports
-import keyring
-from keyring.errors import NoKeyringError
 
 # Local imports
 from spyder.api.utils import PrefixedTuple
@@ -502,6 +500,7 @@ class ConfigurationManager(object):
         return config.options(section)
 
     def get(self, section, option, default=NoDefault, secure=False):
+        import keyring
         """
         Get an `option` on a given `section`.
 
@@ -547,6 +546,8 @@ class ConfigurationManager(object):
 
     def set(self, section, option, value, verbose=False, save=True,
             recursive_notification=True, notification=True, secure=False):
+        import keyring
+        from keyring.errors import NoKeyringError
         """
         Set an `option` on a given `section`.
 
@@ -644,6 +645,8 @@ class ConfigurationManager(object):
         config.remove_section(section)
 
     def remove_option(self, section, option, secure=False):
+        # _smartos_lazy_import : import deplace ici, cf. Commun/scripts/patch_spyder_lazy_imports.py
+        import keyring
         """Remove `option` from `section`."""
         config = self.get_active_conf(section)
 

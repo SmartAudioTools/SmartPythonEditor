@@ -1,0 +1,12 @@
+spyder_konsole https://github.com/SmartAudioTools/spyder_konsole.git
+spyder_claude https://github.com/SmartAudioTools/spyder_claude.git
+spyder_collab https://github.com/SmartAudioTools/spyder_collab.git
+spyder_viztracer https://github.com/SmartAudioTools/spyder_viztracer.git
+spyder_stop_toolbar https://github.com/SmartAudioTools/spyder_stop_toolbar.git
+spyder_code_analysis https://github.com/SmartAudioTools/spyder_code_analysis.git
+spyder_interpreter_toolbar https://github.com/SmartAudioTools/spyder_interpreter_toolbar.git
+spyder_window_controls https://github.com/SmartAudioTools/spyder_window_controls.git
+spyder_pyxel https://github.com/SmartAudioTools/spyder_pyxel.git
+spyder_python_tutor https://github.com/SmartAudioTools/spyder_python_tutor.git
+spyder_line_profiler https://github.com/SmartAudioTools/spyder_line_profiler.git
+spyder_tortoisehg https://github.com/SmartAudioTools/spyder_tortoisehg.git

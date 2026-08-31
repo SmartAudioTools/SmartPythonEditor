@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   viewBox="0 0 16 16"
+   version="1.1"
+   id="svg2"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs3051">
+    <style
+       type="text/css"
+       id="current-color-scheme">
+      .ColorScheme-Text {
+        color:#5d656b;
+      }
+      </style>
+  </defs>
+  <g
+     id="path1"
+     style="opacity:1">
+    <path
+       style="baseline-shift:baseline;display:inline;overflow:visible;vector-effect:none;fill:#ffffff;enable-background:accumulate;stop-color:#000000;stop-opacity:1"
+       d="m 13.661178,2.3765421 -3.280976,3.292987"
+       id="path3" />
+    <path
+       style="baseline-shift:baseline;display:inline;overflow:visible;vector-effect:none;fill:#ffffff;enable-background:accumulate;stop-color:#000000;stop-opacity:1"
+       d="M 12.953125,1.6699219 9.671875,4.9628906 11.087891,6.375 14.369141,3.0820313 Z"
+       id="path4" />
+    <g
+       id="g2">
+      <path
+         d="M 12.464054,7.6498045 9.4121095,7.5282256 A 0.7,0.32200001 44.895318 0 1 8.5250555,6.644407 L 8.3923252,3.5929273 a 0.8652476,0.3980139 44.895318 0 1 0.954786,0.1381851 l 2.9752698,2.9644174 a 0.8652476,0.3980139 44.895318 0 1 0.141673,0.9542747 z"
+         style="baseline-shift:baseline;display:inline;overflow:visible;vector-effect:none;fill:#ffffff;fill-rule:evenodd;enable-background:accumulate;stop-color:#000000;stop-opacity:1"
+         id="path2" />
+    </g>
+  </g>
+  <g
+     id="path1-2"
+     style="opacity:1">
+    <path
+       style="baseline-shift:baseline;display:inline;overflow:visible;vector-effect:none;fill:#ffffff;enable-background:accumulate;stop-color:#000000;stop-opacity:1"
+       d="M 2.3607444,13.660102 5.6417199,10.367115"
+       id="path6" />
+    <path
+       style="baseline-shift:baseline;display:inline;overflow:visible;vector-effect:none;fill:#ffffff;enable-background:accumulate;stop-color:#000000;stop-opacity:1"
+       d="m 4.9335937,9.6621094 -3.28125,3.2929686 1.4160157,1.410156 3.28125,-3.292968 z"
+       id="path7" />
+    <g
+       id="g5">
+      <path
+         d="M 3.5578679,8.3868397 6.6098123,8.5084185 A 0.7,0.32200001 44.895313 0 1 7.4968664,9.3922369 L 7.6295969,12.443717 A 0.8652476,0.3980139 44.895313 0 1 6.6748108,12.305532 L 3.699541,9.3411144 A 0.8652476,0.3980139 44.895313 0 1 3.5578679,8.3868397 Z"
+         style="baseline-shift:baseline;display:inline;overflow:visible;vector-effect:none;fill:#ffffff;fill-rule:evenodd;enable-background:accumulate;stop-color:#000000;stop-opacity:1"
+         id="path5" />
+    </g>
+  </g>
+</svg>

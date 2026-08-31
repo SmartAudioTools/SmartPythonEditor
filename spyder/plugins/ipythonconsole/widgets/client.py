@@ -698,14 +698,28 @@ class ClientWidget(QWidget, SaveHistoryMixin, SpyderWidgetMixin):  # noqa: PLR09
             else:
                 name = self.hostname
             # Adding id to name
-            client_id = self.id_['int_id'] + u'/' + self.id_['str_id']
-            name = name + u' ' + client_id
+            # SmartOS (_smartos_no_bare_a, etendu par _smartos_reuse_numero) : "/A" ne distingue
+            # rien tant qu'aucune seconde console ne partage ce noyau, et l'emplacement
+            # 1 (numerotation reutilisee, cf. create_new_client) ne porte pas non plus
+            # de numero.
+            if self.id_['int_id'] != '1':
+                name = name + u' ' + self.id_['int_id']
+            if self.id_['str_id'] != 'A':
+                name = name + u'/' + self.id_['str_id']
         elif (self.given_name in ["Pylab", "SymPy", "Cython"] or
               self.forcing_custom_interpreter):
             client_id = self.id_['int_id'] + u'/' + self.id_['str_id']
             name = self.given_name + u' ' + client_id
         else:
-            name = self.given_name + u'/' + self.id_['str_id']
+            # SmartOS (_smartos_no_bare_a) : "/A" est du bruit pour la console MASTER d'un
+            # fichier - avec noyau neuf a chaque execution, elle est presque toujours
+            # seule sur son noyau. Une eventuelle console SLAVE ("/B", ...) garde son
+            # suffixe, seul cas ou il distingue vraiment deux onglets. Decision de
+            # l'utilisateur du 09/08/2026.
+            if self.id_['str_id'] == 'A':
+                name = self.given_name
+            else:
+                name = self.given_name + u'/' + self.id_['str_id']
         return name
 
     def get_control(self, pager=True):

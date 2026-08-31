@@ -25,7 +25,6 @@ import time
 import errno
 
 # Third-party imports
-import chardet
 
 # Local imports
 from spyder.utils.external.binaryornot.check import is_binary
@@ -115,6 +114,8 @@ CODECS = [
 
 
 def get_coding(text, force_chardet=False, default_codec=None):
+    # _smartos_lazy_import : import deplace ici, cf. Commun/scripts/patch_spyder_lazy_imports.py
+    import chardet
     """
     Function to get the coding of a text.
 

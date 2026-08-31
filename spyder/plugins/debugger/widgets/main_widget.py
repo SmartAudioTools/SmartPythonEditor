@@ -367,6 +367,28 @@ class DebuggerWidget(ShellConnectMainWidget):
 
         # Options menu
         options_menu = self.get_options_menu()
+
+        # SmartOS (patch_spyder_debugger_toolbar.py) : les points d'entree dans le debogage,
+        # retires de la barre. On les declenche une fois, et le menu Deboguer les propose deja.
+        for item in [
+            enter_debug_action,
+            interrupt_and_debug_action,
+            inspect_action,
+        ]:
+            self.add_item_to_menu(
+                item,
+                menu=options_menu,
+                section="smartos_enter_debug",
+            )
+
+        # SmartOS : navigation et bascule d'affichage, retirees de la barre elles aussi.
+        for item in [goto_cursor_action, toggle_breakpoints_action]:
+            self.add_item_to_menu(
+                item,
+                menu=options_menu,
+                section="smartos_debugger_view",
+            )
+
         for item in [exclude_internal_action]:
             self.add_item_to_menu(
                 item,
@@ -389,25 +411,18 @@ class DebuggerWidget(ShellConnectMainWidget):
                 section=DebuggerWidgetMainToolBarSections.Control,
             )
 
-        for item in [
-            enter_debug_action,
-            interrupt_and_debug_action,
-            inspect_action,
-        ]:
-            self.add_item_to_toolbar(
-                item,
-                toolbar=main_toolbar,
-                section=DebuggerWidgetMainToolBarSections.InteractWithConsole,
-            )
+        # SmartOS (patch_spyder_debugger_toolbar.py) : la section InteractWithConsole est vide,
+        # ses trois actions sont passees dans le menu burger (cf. plus haut).
 
         stretcher = self.create_stretcher(
             DebuggerWidgetToolbarItems.ToolbarStretcher
         )
+        # SmartOS (patch_spyder_debugger_toolbar.py) : la section Extras ne garde que la
+        # recherche et l'etirement (qui pousse le pas-a-pas vers la gauche) ; "Afficher le fichier
+        # et la ligne du debogueur" et "Afficher les points d'arret" sont dans le menu burger.
         for item in [
-            goto_cursor_action,
             search_action,
             stretcher,
-            toggle_breakpoints_action,
         ]:
             self.add_item_to_toolbar(
                 item,
@@ -761,28 +776,31 @@ class DebuggerWidget(ShellConnectMainWidget):
 
     def on_debug_toolbar_rendered(self):
         """Actions to take when the Debug toolbar is rendered."""
+        # SmartOS (cf. Commun/scripts/patch_spyder_debug_toolbar_gap.py) : au repos on RETIRE
+        # reellement les boutons de controle du debogueur de la barre (removeAction), au lieu de
+        # setFixedWidth(0). Motif : setFixedWidth(0) est mis en echec par la feuille de style
+        # (QToolButton width:47px l'emporte), laissant ~14px de slot reserve par bouton -> un large
+        # vide a droite de "Deboguer le fichier" hors session. removeAction supprime le slot entier
+        # (zero espace reserve) ; l'entree de MENU n'est pas touchee (meme QAction, mais le menu est
+        # un conteneur distinct). Les boutons sont reintroduits par
+        # _set_visible_control_debugger_buttons(True) quand une session de debogage demarre.
         debug_toolbar = self.get_toolbar(
             ApplicationToolbars.Debug, plugin=Plugins.Toolbar
         )
+        self._debug_toolbar = debug_toolbar
+        self._control_debugger_actions = [
+            self.get_action(action_id)
+            for action_id in [
+                DebuggerWidgetActions.Next,
+                DebuggerWidgetActions.Step,
+                DebuggerWidgetActions.Return,
+                DebuggerWidgetActions.Continue,
+                DebuggerWidgetActions.Stop,
+            ]
+        ]
 
-        # Get widgets corresponding to control debugger actions in the Debug
-        # toolbar
-        for action_id in [
-            DebuggerWidgetActions.Next,
-            DebuggerWidgetActions.Step,
-            DebuggerWidgetActions.Return,
-            DebuggerWidgetActions.Continue,
-            DebuggerWidgetActions.Stop,
-        ]:
-            action = self.get_action(action_id)
-            widget = debug_toolbar.widgetForAction(action)
-
-            # Hide widgets by default because no debugging session is
-            # active at startup
-            widget.setFixedWidth(0)
-
-            # Save widgets in this list to manipulate them later
-            self._control_debugger_toolbar_widgets.append(widget)
+        # Aucune session active au (re)rendu de la barre : masquer.
+        self._set_visible_control_debugger_buttons(False)
 
     # ---- Private API
     # ------------------------------------------------------------------------
@@ -804,8 +822,17 @@ class DebuggerWidget(ShellConnectMainWidget):
 
     def _set_visible_control_debugger_buttons(self, visible: bool):
         """Show/hide control debugger buttons in the Debug toolbar."""
-        for widget in self._control_debugger_toolbar_widgets:
-            if visible:
-                widget.setFixedWidth(self._app_toolbar_button_width)
-            else:
-                widget.setFixedWidth(0)
+        # SmartOS : afficher = reintroduire les actions dans la barre (retirees d'abord pour garantir
+        # leur ordre d'origine [Next, Step, Return, Continue, Stop], apres "Deboguer le fichier" qui
+        # reste et est le seul autre item) ; masquer = les retirer (slot supprime -> aucun espace).
+        toolbar = getattr(self, "_debug_toolbar", None)
+        actions = getattr(self, "_control_debugger_actions", None)
+        if toolbar is None or actions is None:
+            return
+
+        for action in actions:
+            if action in toolbar.actions():
+                toolbar.removeAction(action)
+        if visible:
+            for action in actions:
+                toolbar.addAction(action)

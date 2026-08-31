@@ -32,10 +32,6 @@ from tempfile import mkdtemp
 from xml.sax.saxutils import escape
 
 # Third party imports
-from docutils.utils import SystemMessage as SystemMessage
-from jinja2 import Environment, FileSystemLoader
-import sphinx
-from sphinx.application import Sphinx
 
 # Local imports
 from spyder.api.translations import _
@@ -78,6 +74,7 @@ def is_sphinx_markup(docstring):
 
 
 def warning(message, css_path=CSS_PATH):
+    from jinja2 import Environment, FileSystemLoader
     """Print a warning message on the rich text view"""
     env = Environment()
     env.loader = FileSystemLoader(osp.join(CONFDIR_PATH, 'templates'))
@@ -86,6 +83,7 @@ def warning(message, css_path=CSS_PATH):
 
 
 def usage(title, message, tutorial_message, tutorial, css_path=CSS_PATH):
+    from jinja2 import Environment, FileSystemLoader
     """Print a usage message on the rich text view"""
     env = Environment()
     env.loader = FileSystemLoader(osp.join(CONFDIR_PATH, 'templates'))
@@ -95,6 +93,7 @@ def usage(title, message, tutorial_message, tutorial, css_path=CSS_PATH):
 
 
 def loading(message, loading_img, css_path=CSS_PATH):
+    from jinja2 import Environment, FileSystemLoader
     """Print loading message on the rich text view."""
     env = Environment()
     env.loader = FileSystemLoader(osp.join(CONFDIR_PATH, 'templates'))
@@ -105,6 +104,7 @@ def loading(message, loading_img, css_path=CSS_PATH):
 
 def generate_context(name='', argspec='', note='', math=False, collapse=False,
                      img_path='', css_path=CSS_PATH):
+    import sphinx
     """
     Generate the html_context dictionary for our Sphinx conf file.
 
@@ -161,6 +161,9 @@ def generate_context(name='', argspec='', note='', math=False, collapse=False,
 
 
 def sphinxify(docstring, context, buildername='html'):
+    # _smartos_lazy_import : import deplace ici, cf. Commun/scripts/patch_spyder_lazy_imports.py
+    from docutils.utils import SystemMessage as SystemMessage
+    from sphinx.application import Sphinx
     """
     Runs Sphinx on a docstring and outputs the processed documentation.
 

@@ -383,10 +383,38 @@ class ToolbarContainer(PluginMainContainer):
 
         # Reorganize toolbars only if this is the first time Spyder starts or
         # new toolbars were added
+        # SMARTOS : ordre explicite des barres d'outils, dicte par l'utilisateur le 26/07/2026
+        # (cf. Commun/scripts/patch_spyder_toolbar_order.py). Les identifiants des barres de
+        # greffons sont ecrits en clair a dessein : ce fichier ne doit dependre d'aucun greffon, et
+        # une barre absente est simplement ignoree (app_toolbars.get renvoie None).
+        _smartos_order = [
+            ApplicationToolbars.File,          # Ouvrir, Nouveau, Enregistrer, Enregistrer tout
+                                               # (epinglee a gauche par le patch du burger)
+            "smartos_code_analysis_toolbar",   # Docteur (pylint sur le fichier courant)
+            ApplicationToolbars.Run,           # Executer le fichier
+            ApplicationToolbars.Debug,         # Deboguer le fichier
+            ApplicationToolbars.Profile,       # Profiler le fichier
+            "python_tutor_toolbar",            # Lancer Python Tutor (greffon SmartOS)
+            "smartos_stop_toolbar",            # Tout arreter (greffon SmartOS)
+            ApplicationToolbars.Main,          # Agrandir le volet courant : action de VUE, donc
+                                               # apres les lanceurs et l'arret, pas au milieu d'eux.
+                                               # Son bouton porte nos deux icones, cf.
+                                               # patch_spyder_maximize_icons.py.
+            "interpreter_toolbar",             # combobox d'interpreteur (greffon SmartOS)
+            "window_controls_toolbar",         # nom du fichier + boutons de fenetre, a droite
+        ]
+
         last_toolbars = self.get_conf("last_toolbars")
         if (
             not last_toolbars
             or set(last_toolbars) != set(app_toolbars.keys())
+            # SMARTOS : imposer l'ordre ci-dessus UNE fois. Sans ce drapeau, le nouvel ordre ne
+            # s'appliquerait qu'au demarrage suivant l'ajout ou le retrait d'une barre - les deux
+            # tests ci-dessus etant faux le reste du temps, Qt restaurant alors les positions
+            # memorisees. Une fois pose, on respecte le choix de l'utilisateur.
+            # Le nom du drapeau est VERSIONNE : changer _smartos_order sans le renommer serait sans
+            # effet la ou il est deja pose.
+            or not self.get_conf("smartos_order_v2", False)
         ):
             logger.debug("Reorganize application toolbars")
 
@@ -395,18 +423,33 @@ class ToolbarContainer(PluginMainContainer):
             for toolbar in self._toolbarslist:
                 self._plugin.main.removeToolBar(toolbar)
 
-            # Add toolbars with the working directory to the right because it's
-            # not clear where it ends, so users can have a hard time finding a
-            # new toolbar in the interface if it's placed next to it.
-            toolbars_order = internal_toolbars_order + external_toolbars
-            for toolbar_id in (
-                toolbars_order
-                + [ApplicationToolbars.WorkingDirectory]
-            ):
+            # SMARTOS : _smartos_order d'abord, puis les barres qu'il ne connait pas (greffon
+            # installe plus tard, barre ajoutee par une montee de version de Spyder) - elles
+            # apparaissent ainsi toujours, mais jamais au milieu de nos groupes.
+            # ⚠ LA BARRE DU REPERTOIRE COURANT N'EST PLUS REMISE DANS LA FENETRE. Spyder l'ajoutait
+            # ici en dur, tout a droite (son commentaire d'origine, conserve juste en dessous,
+            # explique pourquoi). Or patch_spyder_workingdir_in_files.py la sort de la zone d'outils
+            # pour la poser SOUS la barre du dock Fichiers, ou est sa place : le repertoire courant
+            # est fonctionnellement lie a l'explorateur de fichiers. La rajouter ici la reprenait au
+            # dock a chaque REORGANISATION - donc chaque fois que l'ensemble des barres change (un
+            # greffon installe, une barre ajoutee), ce qui explique qu'elle "revenait toujours" dans
+            # la rangee du haut sans qu'on comprenne pourquoi. Elle reste CREEE et visible, dans le
+            # dock ; seule sa remise en zone d'outils disparait.
+            #   Commentaire d'origine de Spyder, pour memoire : "Add toolbars with the working
+            #   directory to the right because it's not clear where it ends, so users can have a
+            #   hard time finding a new toolbar in the interface if it's placed next to it."
+            toolbars_order = _smartos_order + [
+                _tid for _tid in (internal_toolbars_order + external_toolbars)
+                if _tid not in _smartos_order
+                and _tid != ApplicationToolbars.WorkingDirectory
+            ]
+            for toolbar_id in toolbars_order:
                 toolbar = app_toolbars.get(toolbar_id)
                 if toolbar:
                     self._plugin.main.addToolBar(toolbar)
                     toolbar.render()
+
+            self.set_conf("smartos_order_v2", True)
         else:
             logger.debug("Render application toolbars")
 

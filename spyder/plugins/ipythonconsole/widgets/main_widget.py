@@ -682,7 +682,12 @@ class IPythonConsoleWidget(PluginMainWidget, CachedKernelMixin):  # noqa: PLR090
             IPythonConsoleWidgetMenus.SpecialConsoles,
             _('New special console'))
 
+        # SmartOS (patch_spyder_ipython_toolbar.py) : "Effacer la console" rejoint le menu
+        # burger, d'ou elle etait absente alors qu'elle occupait un bouton dans le coin. L'action
+        # existait deja (menu contextuel de la console, avec raccourci) : on ne la cree pas, on
+        # l'ajoute simplement ici.
         for item in [
+                self.clear_console_action,
                 self.interrupt_action,
                 self.restart_action,
                 self.reconnect_action,
@@ -767,9 +772,12 @@ class IPythonConsoleWidget(PluginMainWidget, CachedKernelMixin):  # noqa: PLR090
         )
 
         # --- Add tab corner widgets.
-        self.add_corner_widget(self.stop_button)
-        self.add_corner_widget(self.clear_button)
-        self.add_corner_widget(self.reconnect_button)
+        # SmartOS (patch_spyder_ipython_toolbar.py) : le coin ne garde que l'etiquette du temps
+        # ecoule. "Interrompre le noyau" et "Se reconnecter au noyau distant" etaient des doublons
+        # exacts d'entrees deja presentes dans le menu burger (self.interrupt_action et
+        # self.reconnect_action) ; "Effacer la console" y a ete ajoutee (cf. plus haut). Les trois
+        # boutons restent crees : update_actions() les pilote encore (setEnabled, setMaximumWidth),
+        # ce qui ne pose aucun probleme sur un widget non affiche.
         self.add_corner_widget(self.time_label)
 
         # --- Tabs context menu
@@ -1946,9 +1954,24 @@ class IPythonConsoleWidget(PluginMainWidget, CachedKernelMixin):  # noqa: PLR090
         Uses asynchronous get_user_environment_variables and connects to kernel
         upon future completion.
         """
-        self.master_clients += 1
-        client_id = dict(int_id=str(self.master_clients),
-                         str_id='A')
+        if given_name is None and not filename:
+            # SmartOS (_smartos_reuse_numero) : une console ANONYME (bouton "+", pas de fichier
+            # associe) reutilise le plus petit numero libere par une fermeture, au
+            # lieu de ne jamais redescendre. Decision de l'utilisateur du 09/08/2026,
+            # a la suite du retrait du suffixe "/A" (cf. patch_spyder_console_tab_
+            # no_bare_a.py) : sans elle, la numerotation grimpait pour toujours meme
+            # apres avoir tout referme.
+            numeros_utilises = {
+                int(cl.id_['int_id']) for cl in self.clients if cl.given_name is None
+            }
+            numero = 1
+            while numero in numeros_utilises:
+                numero += 1
+            client_id = dict(int_id=str(numero), str_id='A')
+        else:
+            self.master_clients += 1
+            client_id = dict(int_id=str(self.master_clients),
+                             str_id='A')
 
         # Find what kind of kernel we want
         if self.get_conf('pylab/autoload'):
@@ -2674,6 +2697,18 @@ class IPythonConsoleWidget(PluginMainWidget, CachedKernelMixin):  # noqa: PLR090
             client = self.get_current_client()
         else:
             client = self.get_client_for_file(filename)
+            if client is not None:
+                # Ajout SmartOS (_smartos_fresh_kernel) : noyau NEUF a CHAQUE execution.
+                # On FERME la console dediee precedente au lieu de redemarrer son
+                # noyau : restart_kernel est @qdebounced(200 ms), le redemarrage
+                # arriverait APRES l'envoi du %runfile et tuerait le script en cours
+                # d'execution (aucune sortie, point d'arret jamais atteint).
+                # Fermer puis recreer redonne l'etat exact du premier lancement, seul
+                # chemin qui fonctionne. Decision utilisateur du 01/08/2026, correctif
+                # du 09/08/2026. Cf. patch_spyder_fresh_kernel_per_run.py et
+                # patch_spyder_dedicated_console_default.py.
+                self.close_client(client=client, ask_recursive=False)
+                client = None
             if client is None:
                 # Create new client before running script
                 client = self.create_client_for_file(
