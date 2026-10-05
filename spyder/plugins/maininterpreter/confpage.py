@@ -105,6 +105,10 @@ class MainInterpreterConfigPage(PluginConfigPage):
         )
         self.cus_exec_combo.setStyleSheet("margin-left: 3px")
         self.cus_exec_combo.combobox.setMinimumWidth(400)
+        # maxVisibleItems porte a 30 (SmartOS, cf.
+        # Commun/scripts/patch_spyder_interpreter_max_visible.py) : le defaut Qt (10) force un
+        # ascenseur des que la liste d'interpreteurs personnalises depasse 10 entrees.
+        self.cus_exec_combo.combobox.setMaxVisibleItems(30)
 
         self.def_exec_radio.radiobutton.toggled.connect(
             self.cus_exec_combo.setDisabled)

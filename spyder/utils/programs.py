@@ -28,7 +28,15 @@ import logging
 # Third party imports
 from packaging.version import parse
 import psutil
-from requests.structures import CaseInsensitiveDict
+
+
+# Ajout SmartOS (_smartos_lazy_demarrage:requests.structures) : requests n'est importe
+# qu'a la construction (Windows seulement). Voir patch_spyder_lazy_imports_demarrage.py.
+def CaseInsensitiveDict(*args, **kwargs):
+    from requests.structures import CaseInsensitiveDict as _CaseInsensitiveDict
+    return _CaseInsensitiveDict(*args, **kwargs)
+
+
 from spyder_kernels.utils.pythonenv import is_conda_env
 
 # Local imports

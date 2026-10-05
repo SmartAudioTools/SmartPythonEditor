@@ -5668,7 +5668,7 @@ msgstr "Le répertoire du projet ne peut pas contenir « : »"
 
 #: spyder/plugins/projects/widgets/projectdialog.py:85
 msgid "Location"
-msgstr "Répertoire"
+msgstr "Répertoire parent"
 
 #: spyder/plugins/projects/widgets/projectdialog.py:137 spyder/plugins/projects/widgets/projectdialog.py:301
 msgid "This is empty"
@@ -7540,7 +7540,7 @@ msgstr "Exclure les variables qui commencent par un trait de soulignement"
 
 #: spyder/plugins/variableexplorer/widgets/main_widget.py:400
 msgid "Exclude all-uppercase variables"
-msgstr "Exclure les variables en majuscule"
+msgstr "Exclure les variables tout en majuscules"
 
 #: spyder/plugins/variableexplorer/widgets/main_widget.py:401
 msgid "Exclude variables whose name is uppercase"
@@ -7548,7 +7548,7 @@ msgstr "Exclure les variables dont le nom est en majuscule"
 
 #: spyder/plugins/variableexplorer/widgets/main_widget.py:408
 msgid "Exclude capitalized variables"
-msgstr "Exclure les variables en majuscule"
+msgstr "Exclure les variables commençant par une majuscule"
 
 #: spyder/plugins/variableexplorer/widgets/main_widget.py:409
 msgid "Exclude variables whose name starts with a capital letter"
@@ -8555,3 +8555,20 @@ msgstr "Naviguer dans les onglets"
 msgid "Close current tab"
 msgstr "Fermer l'onglet"
 
+
+# Traductions personnalisees SmartOS (cf. Commun/scripts/patch_spyder_add_translations.py)
+
+msgid "Filter files"
+msgstr "Filtrer les fichiers"
+
+msgid "Line {line}, Column {column}"
+msgstr "Ligne {line}, Colonne {column}"
+
+msgid "encoding {encoding}"
+msgstr "encodage {encoding}"
+
+msgid "end of line {eol}"
+msgstr "fin de ligne {eol}"
+
+msgid "Current project"
+msgstr "Projet courant"

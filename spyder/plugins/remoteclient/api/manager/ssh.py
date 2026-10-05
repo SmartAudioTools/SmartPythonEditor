@@ -16,7 +16,7 @@ from __future__ import annotations
 import asyncio
 import json
 
-import asyncssh
+# Ajout SmartOS (_smartos_lazy_demarrage:asyncssh) : import differe dans les 6 fonction(s) qui s'en servent.
 from packaging.version import Version
 
 from spyder.api.translations import _
@@ -31,7 +31,7 @@ from spyder.plugins.remoteclient.api.protocol import (
     ConnectionStatus,
     SSHClientOptions,
 )
-from spyder.plugins.remoteclient.api.ssh import SpyderSSHClient
+# Ajout SmartOS (_smartos_lazy_demarrage:spyder.plugins.remoteclient.api.ssh) : import differe dans les 1 fonction(s) qui s'en servent.
 from spyder.plugins.remoteclient.utils.installation import (
     SERVER_ENV,
     get_installer_command,
@@ -53,6 +53,7 @@ class SpyderRemoteSSHAPIManager(SpyderRemoteAPIManagerBase):
     )
 
     def __init__(self, conf_id, options: SSHClientOptions, _plugin=None):
+        import asyncssh  # _smartos_lazy_demarrage:asyncssh
         super().__init__(conf_id, options, _plugin)
 
         self._ssh_connection: asyncssh.SSHClientConnection = None
@@ -108,10 +109,12 @@ class SpyderRemoteSSHAPIManager(SpyderRemoteAPIManagerBase):
     @property
     def client_factory(self):
         """Return the client factory."""
+        from spyder.plugins.remoteclient.api.ssh import SpyderSSHClient  # _smartos_lazy_demarrage:spyder.plugins.remoteclient.api.ssh
         return lambda: SpyderSSHClient(self)
 
     async def get_server_info(self):
         """Check if the remote server is running."""
+        import asyncssh  # _smartos_lazy_demarrage:asyncssh
         if self._ssh_connection is None:
             self.logger.debug("ssh connection was not established")
             return None
@@ -143,6 +146,7 @@ class SpyderRemoteSSHAPIManager(SpyderRemoteAPIManagerBase):
 
     async def _start_remote_server(self):
         """Start remote server."""
+        import asyncssh  # _smartos_lazy_demarrage:asyncssh
         if not self.connected:
             self.logger.error("SSH connection is not open")
             self._emit_connection_status(
@@ -241,6 +245,7 @@ class SpyderRemoteSSHAPIManager(SpyderRemoteAPIManagerBase):
 
     async def ensure_server_installed(self) -> bool:
         """Check remote server version."""
+        import asyncssh  # _smartos_lazy_demarrage:asyncssh
         if not self.connected:
             self.logger.error("SSH connection is not open")
             self._emit_connection_status(
@@ -289,6 +294,7 @@ class SpyderRemoteSSHAPIManager(SpyderRemoteAPIManagerBase):
 
     async def _install_remote_server(self):
         """Install remote server."""
+        import asyncssh  # _smartos_lazy_demarrage:asyncssh
         if not self.connected:
             self.logger.error("SSH connection is not open")
             self._emit_connection_status(
@@ -344,6 +350,7 @@ class SpyderRemoteSSHAPIManager(SpyderRemoteAPIManagerBase):
         bool
             True if the connection was successful, False otherwise.
         """
+        import asyncssh  # _smartos_lazy_demarrage:asyncssh
         connect_kwargs = {
             k: v
             for k, v in self.options.items()

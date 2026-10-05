@@ -38,6 +38,11 @@ from spyder.widgets.sidebardialog import SidebarDialog
 from spyder.widgets.helperwidgets import MessageLabel
 
 
+# SmartOS (patch_spyder_projects_dialog.py) : repertoire propose par defaut pour un projet neuf.
+# Meme valeur que la racine scannee par le combo du panneau Projets (patch_spyder_projects_toolbar).
+SMARTOS_PROJECTS_ROOT = "/DATA/Python"
+
+
 # =============================================================================
 # ---- Auxiliary functions and classes
 # =============================================================================
@@ -263,6 +268,11 @@ class NewDirectoryPage(BaseProjectPage):
             ),
             status_icon=ima.icon("error"),
         )
+
+        # SmartOS (patch_spyder_projects_dialog.py) : champ pre-rempli plutot que vide. Il sert
+        # aussi de point de depart au bouton "Parcourir", qui repartait sinon du dossier personnel.
+        if osp.isdir(SMARTOS_PROJECTS_ROOT):
+            self._location.textbox.setText(SMARTOS_PROJECTS_ROOT)
 
         layout = QVBoxLayout()
         layout.addWidget(description)

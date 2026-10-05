@@ -242,6 +242,359 @@ class Layout(SpyderPluginV2, SpyderShortcutsMixin):
         # Update panes and toolbars lock status
         self.toggle_lock(self._interface_locked)
 
+        # SmartOS (patch_spyder_deux_ecrans.py) : poser la barre « Écrans » et son bouton de
+        # bascule, puis rendre le mode s'il etait actif a la fermeture precedente.
+        from qtpy.QtCore import QTimer as _SmartosQTimerEcrans
+        _SmartosQTimerEcrans.singleShot(0, self._smartos_installer_deux_ecrans)
+
+        # SmartOS (patch_spyder_hide_docks.py) : masquer PAR DEFAUT les docks Line Profiler et
+        # Debogueur, juges redondants / peu utilises (chapitre Dock2, demande utilisateur). On
+        # les cache UNE seule fois - au premier lancement apres ce correctif - puis on respecte le
+        # choix de l'utilisateur (s'il les reaffiche, ils restent affiches). Les greffons ne sont
+        # PAS desactives (profilage F10 et timings dans l'editeur intacts).
+        if not self.get_conf("smartos_docks_hidden_once", False):
+            for _smartos_dock in ("spyder_line_profiler", "debugger"):
+                _smartos_plugin = self.get_plugin(_smartos_dock, error=False)
+                if _smartos_plugin is not None:
+                    _smartos_plugin.get_widget().toggle_view(False)
+            self.set_conf("smartos_docks_hidden_once", True)
+
+        # SmartOS (2e passe, 26/07/2026, item 6 du TODO cosmetique) : meme mecanisme pour
+        # VizTracer, Profileur, Historique et Terminal. DRAPEAU DISTINCT du precedent, qui est
+        # deja a True : le reutiliser n'aurait rien masque, et le remettre a False aurait
+        # re-masque Line Profiler et Debogueur que l'utilisateur a peut-etre reaffiches depuis.
+        if not self.get_conf("smartos_docks_hidden_v2", False):
+            for _smartos_dock in (
+                "viztracer_profiler", "profiler", "historylog", "terminal"
+            ):
+                _smartos_plugin = self.get_plugin(_smartos_dock, error=False)
+                if _smartos_plugin is not None:
+                    _smartos_plugin.get_widget().toggle_view(False)
+            self.set_conf("smartos_docks_hidden_v2", True)
+
+        # SmartOS (patch_spyder_pane_maximize_button.py) : poser le bouton "Agrandir le volet" a
+        # DROITE de l'en-tete des panneaux qui en ont l'usage, la barre d'outils globale etant
+        # masquee. DIFFERE d'un tour de boucle : les panneaux doivent tous exister et avoir
+        # construit leur en-tete.
+        from qtpy.QtCore import QTimer as _SmartosQTimer
+        _SmartosQTimer.singleShot(0, self._smartos_add_pane_maximize_buttons)
+
+    #: SmartOS : panneaux dont le CONTENU gagne a occuper toute la fenetre (critere valide par
+    #: l'utilisateur le 26/07/2026). La console, les fichiers, l'organisation du code et l'analyse
+    #: de code en sont volontairement absents : ils sont etroits par nature.
+    #: ⚠ "editor" N'Y EST PAS : l'Editeur n'a pas UNE barre d'onglets mais UNE PAR VOLET, et les
+    #: volets naissent et meurent au fil des scissions - un bouton pose une fois pour toutes ne peut
+    #: pas suivre (releve du 27/07/2026 : il ne servait que le volet du haut). C'est donc
+    #: EditorStack qui cree le sien, cf. Commun/scripts/patch_spyder_editor_split_buttons.py.
+    SMARTOS_PANNEAUX_AGRANDISSABLES = (
+        "pyxel_game",
+        "pyxel_studio",
+        "python_tutor",
+        "viztracer_profiler",
+        "plots",
+        # Ajoute le 27/07/2026, a la demande de l'utilisateur : « peux-tu ajouter le bouton
+        # d'agrandissement pour le panneau Claude ? car la je ne peux pas verifier la mosaique ».
+        # Il entre dans le critere sans discussion — c'est meme le seul panneau dont l'agrandissement
+        # CHANGE le contenu : au-dela d'une session, il etale ses onglets en mosaique.
+        "claude_pane",
+        # Ajoute le 31/07/2026, meme demande pour le panneau Terminal : « comme pour le panneau
+        # Claude, peux-tu ajouter un bouton d'agrandissement au panneau Terminal, qui permet de
+        # l'agrandir et de passer en vue onglet ou mosaique ? »
+        # ⚠ IL N'Y AVAIT RIEN A ECRIRE D'AUTRE QUE CETTE LIGNE, et c'est le seul point a
+        # comprendre : la mosaique et sa bascule ont ete recopiees dans ce panneau le meme jour,
+        # quand les deux greffons sont devenus independants. Elles etaient donc deja la, mais
+        # INATTEIGNABLES — la mosaique ne s'affiche que dans un panneau agrandi, et ce panneau
+        # n'avait aucun moyen de l'etre. Le bouton ne l'ajoute pas, il l'ouvre.
+        "native_terminal",
+    )
+
+    def _smartos_add_pane_maximize_buttons(self):
+        """
+        Poser l'action d'agrandissement dans l'en-tete de chaque panneau retenu, calee a droite, et
+        sur la ligne des titres d'onglets quand le panneau en a.
+        Cf. Commun/scripts/patch_spyder_pane_maximize_button.py pour le detail et les pieges.
+        """
+        action = self.get_container()._maximize_dockwidget_action
+
+        for _nom in self.SMARTOS_PANNEAUX_AGRANDISSABLES:
+            try:
+                plugin = self.get_plugin(_nom, error=False)
+                if plugin is None:
+                    continue
+                widget = plugin.get_widget()
+                if getattr(widget, "_smartos_bouton_agrandir", None) is not None:
+                    continue  # deja pose (methode rejouee)
+
+                bouton = self._smartos_poser_bouton_agrandir(widget, action)
+                if bouton is None:
+                    continue
+                widget._smartos_bouton_agrandir = bouton
+
+                # ⚠ FOND GRISE A L'ETAT COCHE (panneau agrandi) : meme demande de l'utilisateur,
+                # meme jour, que pour le bouton "Mode deux ecrans" - garder un fond transparent.
+                # Cf. patch_spyder_deux_ecrans.py pour la meme regle, ET pour le meme piege : un
+                # type-selecteur nu (QToolButton:checked) perd face a la feuille de style plus
+                # SPECIFIQUE que Spyder pose au niveau de l'application - releve de l'utilisateur,
+                # le fond restait gris malgre ce style. Nom d'objet UNIQUE par panneau, cible par
+                # selecteur d'ID (specificite maximale). Une SEULE action partagee
+                # (`_maximize_dockwidget_action`) alimente les 7 boutons de ce patch : la regle
+                # doit donc etre reposee sur CHACUN d'eux, pas une seule fois.
+                bouton.setObjectName(f"smartos_bouton_agrandir_{_nom}")
+                bouton.setStyleSheet(
+                    f"QToolButton#smartos_bouton_agrandir_{_nom}"
+                    " { background-color: transparent; border: none; } "
+                    f"QToolButton#smartos_bouton_agrandir_{_nom}:checked"
+                    " { background-color: transparent; border: none; } "
+                    f"QToolButton#smartos_bouton_agrandir_{_nom}:hover"
+                    " { background-color: transparent; border: none; } "
+                    f"QToolButton#smartos_bouton_agrandir_{_nom}:pressed"
+                    " { background-color: transparent; border: none; }"
+                )
+
+                # ⚠ maximize_dockwidget() choisit sa cible par QApplication.focusWidget(), qui n'a
+                # pas le temps de refleter un changement survenu dans le MEME clic (synchrone) que
+                # le `toggled` qui suit `pressed` et invoque maximize_dockwidget() - decouvert le
+                # 01/08/2026 (TODO - Spyder - General.txt, bug rapporte sur le mode deux ecrans) :
+                # sans repli, ce focus perime fait retomber l'agrandissement sur l'Editeur (mono
+                # fenetre) ou sur la MAUVAISE FENETRE (mode deux ecrans). On retient donc
+                # explicitement, ICI, QUEL panneau vient d'etre presse - cf.
+                # _smartos_bouton_agrandir_presse plus bas.
+                bouton.pressed.connect(
+                    lambda _p=plugin, _a=action: self._smartos_bouton_agrandir_presse(_p, _a)
+                )
+            except Exception:
+                # Un panneau recalcitrant ne doit pas priver les autres de leur bouton, ni casser le
+                # demarrage pour un ajout cosmetique.
+                logger.debug("Bouton d'agrandissement non pose sur %s", _nom, exc_info=True)
+
+            # Hors du try qui precede : que le bouton ait pu etre pose ou non, un burger vide ne doit
+            # pas rester affiche. C'est une demande a part entiere de l'utilisateur, elle ne doit pas
+            # tomber avec l'echec de l'autre.
+            try:
+                self._smartos_masquer_burger_vide(widget)
+            except Exception:
+                logger.debug("Burger vide non masque sur %s", _nom, exc_info=True)
+
+    def _smartos_bouton_agrandir_presse(self, plugin, action):
+        """
+        Reagir au clic sur UN bouton d'agrandissement precis (`pressed`, avant que l'action ne
+        bascule). Retient explicitement CE panneau (`_smartos_bouton_agrandir_cible`), consomme en
+        UNE FOIS par `maximize_dockwidget()` (patch_spyder_deux_ecrans_maximize.py) a la place d'un
+        focus Qt pas encore a jour. None quand l'action est deja cochee (le clic veut dire "revenir
+        en arriere") : ce cas ne doit pas influencer une future selection.
+
+        `switch_to_plugin(force_focus=True)` RESTE NECESSAIRE ICI, et ce n'est PAS ce qui causait le
+        bug "Hierarchie" releve par l'utilisateur le 01/08/2026 - hypothese emise a l'epoque (son
+        appel a `maximize_dockwidget()` avant celui du bouton, dans le meme clic, semblait un
+        candidat plausible), RETIREE puis VERIFIEE FAUSSE par un test A/B en direct
+        (HGIGNORED/scenario_test_switch_to_plugin_hypothese.json) : avec l'appel, un panneau deja
+        agrandi ailleurs est proprement desagrandi puis le bon panneau est agrandi ; SANS l'appel,
+        cliquer ce bouton alors qu'autre chose est deja agrandi ne fait plus RIEN DU TOUT (le clic
+        retombe sur la restauration de l'ancien agrandissement, jamais sur le nouveau) - une
+        regression reelle, plus genante que le bug qu'on croyait corriger. La cause du bug Hierarchie
+        etait ailleurs (disposition de fenetre corrompue par des essais anterieurs, cf. DONE - Spyder
+        - cosmetique et disposition.txt).
+        """
+        self._smartos_bouton_agrandir_cible = None if action.isChecked() else plugin
+        if not action.isChecked():
+            plugin.switch_to_plugin(force_focus=True)
+
+    @staticmethod
+    def _smartos_ligne_des_onglets(widget):
+        """
+        Le coin haut-droit d'une barre d'onglets VISIBLE, ou None.
+
+        L'utilisateur veut le bouton "a la meme hauteur que les titres d'onglets" quand il y en a.
+        Le critere est donc la VISIBILITE DE LA BARRE D'ONGLETS, et non la seule existence d'un
+        widget a onglets : Pyxel (panneau du jeu) en contient un dont la barre est masquee - y poser
+        le bouton l'aurait mis dans une ligne invisible. Releve du 26/07/2026 : barre visible pour
+        l'Editeur (44 px) et Pyxel Studio (29 px), masquee pour Pyxel.
+
+        ⚠ NE PAS Y AJOUTER DE DRAPEAU « ce panneau refuse cet emplacement ». Essaye le 27/07/2026
+        pour le panneau Claude, dont la barre d'onglets disparait en mode mosaique : le drapeau
+        FONCTIONNAIT (cette methode rendait bien None) et ne changeait RIEN au resultat — le repli
+        `add_corner_widget` mene au MEME MainCornerWidget, celui que Spyder place lui-meme dans la
+        barre d'onglets des qu'un panneau contient un `Tabs`. Il n'y en a qu'un. Mesure : bouton a
+        44x43 dans MainCornerWidget, avec le drapeau comme sans lui. C'etait donc du code mort,
+        retire a la passe de simplification. Un panneau dont la barre d'onglets disparait doit
+        porter son propre bouton la ou il reste visible (cf. spyder_claude/mosaique.py), pas
+        esperer un autre emplacement de celui-ci.
+        """
+        from qtpy.QtCore import Qt as _SmartosQt
+        from qtpy.QtWidgets import QHBoxLayout as _SmartosQHBoxLayout
+        from qtpy.QtWidgets import QTabWidget as _SmartosQTabWidget
+        from qtpy.QtWidgets import QWidget as _SmartosQWidget
+
+        for _tw in widget.findChildren(_SmartosQTabWidget):
+            if not _tw.isVisible() or not _tw.tabBar().isVisible():
+                continue
+            _coin = _tw.cornerWidget(_SmartosQt.TopRightCorner)
+            if _coin is not None and _coin.layout() is not None:
+                return _coin
+            # Pas de coin exploitable : en poser un. C'est le cas de Pyxel Studio, dont le coin
+            # existe mais mesure 0x0 et n'accueille rien.
+            _neuf = _SmartosQWidget(_tw)
+            _boite = _SmartosQHBoxLayout(_neuf)
+            _boite.setContentsMargins(0, 0, 0, 0)
+            _boite.setSpacing(0)
+            _tw.setCornerWidget(_neuf, _SmartosQt.TopRightCorner)
+            return _neuf
+        return None
+
+    def _smartos_poser_bouton_agrandir(self, widget, action):
+        """
+        Poser le bouton et renvoyer le QToolButton cree, ou None.
+
+        Deux emplacements, cf. l'en-tete du patch : sur la ligne des titres d'onglets quand le
+        panneau en a une, dans la barre de coin du panneau sinon. Dans les deux cas, a DROITE.
+        """
+        from qtpy.QtWidgets import QToolButton as _SmartosQToolButton
+
+        _coin = self._smartos_ligne_des_onglets(widget)
+        if _coin is not None:
+            # ⚠ UN COIN PEUT ETRE UNE BARRE D'OUTILS, ET ON N'EMPILE PAS UN WIDGET DANS LE LAYOUT
+            # D'UNE BARRE D'OUTILS. `MainCornerWidget`, le coin que Spyder pose sur la barre
+            # d'onglets de certains panneaux, HERITE DE QToolBar : son layout est un QToolBarLayout,
+            # qui n'a ni insertWidget ni un addWidget qui range quoi que ce soit. On lui donne donc
+            # l'ACTION, et Qt fabrique le bouton, le place et le dimensionne.
+            #
+            # Mesure du 27/07/2026, panneau Claude, en deux temps — les deux tentatives ratees sont
+            # gardees parce qu'elles ont chacune une signature reconnaissable :
+            #   1. `layout().insertWidget(0, b)` -> AttributeError sur un QLayout generique,
+            #      exception avalee par l'appelant, AUCUN bouton et aucun message ;
+            #   2. `layout().addWidget(b)` -> le bouton existe, mais HORS LAYOUT : dessine en
+            #      100x30 (taille par defaut d'un widget jamais mis en page) au milieu de voisins
+            #      en 44x44. C'est exactement le piege des boutons orphelins deja paye trois fois
+            #      sur ce depot.
+            # Et une ACTION, contrairement a un bouton, ne laisse rien derriere elle si on la
+            # deplace un jour.
+            from qtpy.QtWidgets import QToolBar as _SmartosQToolBar
+            if isinstance(_coin, _SmartosQToolBar):
+                _coin.addAction(action)
+                return _coin.widgetForAction(action)
+
+            bouton = _SmartosQToolButton(_coin)
+            bouton.setDefaultAction(action)
+            bouton.setAutoRaise(True)
+            # ⚠ NE PAS FIGER LA TAILLE SUR CELLE D'UN VOISIN : mesure trop tot, elle valait 44x0 et
+            # le bouton etait invisible tout en etant "present" (releve du 26/07/2026). On ne fixe
+            # que la taille d'icone et on laisse le layout dimensionner le reste.
+            _voisins = [_b for _b in _coin.findChildren(_SmartosQToolButton) if _b is not bouton]
+            if _voisins:
+                bouton.setIconSize(_voisins[0].iconSize())
+            # En TETE du layout : le burger preexistant reste le dernier element, donc le plus a
+            # droite, et notre bouton se place juste a sa gauche - "a cote du burger", comme demande.
+            #
+            # ⚠ insertWidget N'EXISTE QUE SUR UN QBoxLayout, et le coin d'un panneau n'en a pas
+            # forcement un. Mesure du 27/07/2026 sur le panneau Claude : son coin est le
+            # MainCornerWidget de Spyder, dont layout() rend un QLayout generique — l'appel levait
+            # « 'PySide6.QtWidgets.QLayout' object has no attribute 'insertWidget' », l'exception
+            # etait avalee par le try de l'appelant et journalisee en debug, donc AUCUN bouton et
+            # AUCUN message. Le cas ne s'etait jamais presente parce que cette branche n'avait plus
+            # qu'un seul utilisateur, l'Editeur, sorti de la liste le matin meme : du code sans
+            # appelant, qui se degrade en silence. Les autres panneaux passent par le `_neuf` de
+            # _smartos_ligne_des_onglets, un QHBoxLayout que nous construisons — d'ou insertWidget
+            # disponible chez eux et pas ici.
+            _layout = _coin.layout()
+            if hasattr(_layout, "insertWidget"):
+                _layout.insertWidget(0, bouton)
+            else:
+                # Pas de QBoxLayout : on ajoute en fin, ce qui met le bouton le plus a DROITE.
+                # C'est l'emplacement demande par l'utilisateur, et le burger de ces panneaux-la
+                # est de toute facon masque quand son menu est vide.
+                _layout.addWidget(bouton)
+            return bouton
+
+        # Cas general : la barre de coin du panneau.
+        widget.add_corner_widget(action)
+        bouton = widget.get_corner_widget(action.name)
+        if bouton is not None:
+            self._smartos_caler_le_coin_a_droite(widget, bouton)
+        return bouton
+
+    @staticmethod
+    def _smartos_caler_le_coin_a_droite(widget, bouton):
+        """
+        Rendre le coin visible et y caler le contenu A DROITE.
+
+        Deux defauts constates, chacun mesure :
+          - le coin peut etre invisible : patch_spyder_dock_actions.py masque le burger des panneaux
+            au menu vide, et un coin sans rien a montrer n'est pas affiche par Qt. Le bouton etait
+            alors pose sans etre visible, et rien ne le signalait ;
+          - le contenu se cale a GAUCHE dans les panneaux SANS barre d'outils principale (Pyxel,
+            Python Tutor) : rien ne pousse le coin, qui prend toute la largeur. L'espaceur va DANS
+            le widget de coin (MainCornerWidget), et non dans la barre de coin qui le contient :
+            mesure du 26/07/2026, un espaceur place dans la barre laissait encore les boutons a
+            gauche d'un widget de coin large de 440 px.
+        """
+        from qtpy.QtWidgets import QSizePolicy as _SmartosQSizePolicy
+        from qtpy.QtWidgets import QWidget as _SmartosQWidget
+
+        bouton.setVisible(True)
+        for _attr in ("_corner_widget", "_corner_toolbar"):
+            _zone = getattr(widget, _attr, None)
+            if _zone is not None:
+                _zone.setVisible(True)
+
+        _coin = getattr(widget, "_corner_widget", None)
+        if _coin is not None and not getattr(_coin, "_smartos_cale_a_droite", False):
+            _coin._smartos_cale_a_droite = True
+            _espaceur = _SmartosQWidget(_coin)
+            _espaceur.setSizePolicy(
+                _SmartosQSizePolicy.Expanding, _SmartosQSizePolicy.Preferred)
+            _actions = _coin.actions()
+            if _actions:
+                _coin.insertWidget(_actions[0], _espaceur)
+            else:
+                _coin.addWidget(_espaceur)
+
+    @staticmethod
+    def _smartos_masquer_burger_vide(widget):
+        """
+        Masquer le bouton burger d'un panneau dont le menu d'options n'a aucune entree.
+
+        ⚠ IL FAUT MASQUER L'ACTION, PAS LE WIDGET. Le burger est tenu par une barre d'outils Qt (le
+        MainCornerWidget en est une), via une QWidgetAction. Or QToolBarLayout REAFFICHE le widget de
+        chaque action dont l'ACTION est visible des que la barre redevient visible - ce que fait
+        justement _smartos_caler_le_coin_a_droite juste avant. Un setVisible(False) pose sur le seul
+        bouton etait donc annule aussitot : releve du 26/07/2026, trois panneaux a zero entree de menu
+        et burger pourtant affiche, alors que les deux panneaux passes par la ligne d'onglets - ou la
+        barre n'est pas re-affichee - respectaient la consigne. C'est ce contraste qui a mis le doigt
+        dessus.
+        Meme cause pour patch_spyder_dock_actions.py, qui porte la meme regle et paraissait inoperant :
+        il masque bien le bouton au demarrage, mais nous ressuscitions le burger en rendant le coin
+        visible. La regle est donc rejouee ici, sur l'action.
+        """
+        _burger = getattr(widget, "_options_button", None)
+        _menu = getattr(widget, "_options_menu", None)
+        if _burger is None or _menu is None:
+            return
+        _menu._dirty = True
+        _menu.render()
+        _garder = any(not _a.isSeparator() for _a in _menu.actions())
+
+        _burger.setVisible(_garder)
+        _coin = getattr(widget, "_corner_widget", None)
+        if _coin is not None:
+            for _act in _coin.actions():
+                try:
+                    if _coin.widgetForAction(_act) is _burger:
+                        _act.setVisible(_garder)
+                except Exception:
+                    continue
+
+        # SmartOS (3e passe, 08/08/2026) : Analyse de code (pylint). La disposition par
+        # defaut de Spyder l'affiche ; ici le bouton Docteur et la marge (greffon
+        # spyder_code_analysis) couvrent l'usage courant, le panneau se rouvre de
+        # lui-meme au premier clic sur Docteur. Drapeau DISTINCT, comme pour la v2 :
+        # les configurations dont v1/v2 sont deja consommes doivent quand meme le
+        # masquer une fois.
+        if not self.get_conf("smartos_docks_hidden_v3", False):
+            _smartos_plugin = self.get_plugin("pylint", error=False)
+            if _smartos_plugin is not None:
+                _smartos_plugin.get_widget().toggle_view(False)
+            self.set_conf("smartos_docks_hidden_v3", True)
+
     # ---- Private API
     # -------------------------------------------------------------------------
     @property
@@ -743,6 +1096,588 @@ class Layout(SpyderPluginV2, SpyderShortcutsMixin):
         """Expose maximize current dockwidget action."""
         return self.get_container()._maximize_dockwidget_action
 
+    # SmartOS (patch_spyder_deux_ecrans.py) : mode DEUX ECRANS. Cf. l'en-tete du patch pour
+    # le releve des panneaux et ce qui n'est pas faisable sous Wayland.
+
+    #: Panneaux qui partent sur le second ecran : ceux qui sont A DROITE de l'editeur, calcule EN
+    #: DIRECT a chaque entree dans le mode (plus une liste figee dans le code, cf. plus bas) -
+    #: demande de l'utilisateur du 01/08/2026, apres avoir du faire retirer "find_in_files" a la
+    #: main quand il l'a deplace a gauche dans SA disposition : suivre sa disposition reelle evite
+    #: cette friction pour tout futur reamenagement.
+    #:
+    #: Identifiant de la barre d'application qui porte le bouton de bascule.
+    SMARTOS_BARRE_ECRANS = "smartos_toolbar_ecrans"
+
+    #: Options de configuration ou sont memorisees les deux dispositions.
+    #:
+    #: ⚠ POURQUOI LA CLE EST VERSIONNEE, ET CE QUE CELA NE DIT PAS. `saveState()` est MONOLITHIQUE :
+    #: il enregistre les panneaux ET les barres d'outils. Une disposition enregistree pendant que la
+    #: rangee etait cassee la restitue donc fidelement a chaque bascule - et la sortie du mode la
+    #: reenregistre telle quelle. Cela ressemble a une boucle qui s'aggrave ; ce n'en est pas une.
+    #: MESURE DU 31/07/2026, cinq bascules d'affilee en partant d'une cle vierge : ecart du groupe au
+    #: centre de 0 pixel, dix relevés. Aucune derive. Un etat SAIN se reenregistre sain ; c'est un
+    #: etat HERITE qui se perpetue.
+    #: (Un residu de -8 px subsistait avant que la barre « Écrans » ne recopie l'etat verrouille des
+    #: autres : c'etait la largeur de sa poignee de deplacement, que j'avais mise sur le compte d'un
+    #: arrondi. Une explication commode vaut moins qu'une mesure de plus.)
+    #: Il n'y avait donc rien a corriger dans le mecanisme, et surtout rien a lui retirer - deux
+    #: correctifs ont ete ecrits puis jetes avant de le comprendre (forcer la barre de centrage a se
+    #: reajuster, rejouer le calcul apres restauration : mesures sans effet, l'espace libere etant
+    #: aussitot repris par la zone de gauche). Il fallait REPARTIR PROPRE, et rien d'autre.
+    #: v2 avait ete polluee de la meme facon quelques heures apres sa creation, par une version
+    #: encore cassee essayee entre-temps : changer de nom ne protege que si l'on change de nom APRES
+    #: que le defaut est corrige.
+    SMARTOS_CONF_MODE = "smartos_mode_deux_ecrans"
+    #: ⚠ CETTE CLE A ETE VERSIONNEE (v1 a v4) PENDANT LE DEVELOPPEMENT DE CE PATCH - PLUS
+    #: MAINTENANT. Tant que la rangee de barres changeait, la cle changeait avec elle : l'etat
+    #: memorise fige la POSITION des barres autant que celle des panneaux, et deplacer la barre
+    #: « Écrans » sans renommer la cle la faisait revenir a son ancienne place a la premiere
+    #: bascule (constate deux fois le 31/07/2026, v2 puis v3 polluees dans l'heure par une session
+    #: lancee entre la creation de la cle et la retouche suivante). Renommee en anglais et
+    #: DEVERSIONNEE le 01/08/2026 (demande explicite de l'utilisateur : les numeros de version
+    #: etaient utiles pendant le developpement, plus dans la solution finale). Consequence a
+    #: assumer pour toute retouche future de la rangee de barres : reinitialiser la cle a la main
+    #: (`set_conf(SMARTOS_CONF_ETATS, {})`) plutot que de lui donner un nouveau nom.
+    SMARTOS_CONF_ETATS = "window_state_screens"
+
+    def _smartos_creer_fenetre_ecran2(self):
+        """La seconde fenetre, prete a recevoir des panneaux."""
+        from qtpy.QtWidgets import QMainWindow as _SmartosQMainWindow
+
+        fenetre = _SmartosQMainWindow()
+        fenetre.setObjectName("smartos_fenetre_ecran2")
+        fenetre.setWindowTitle(_("Spyder — second écran"))
+
+        # ⚠ LA TAILLE SE MEMORISE, LA POSITION NON, et il ne faut pas laisser croire le contraire.
+        # `restoreGeometry` rend la taille ET l'etat maximise/plein ecran, ce qui est l'essentiel de
+        # ce que l'utilisateur regle a la main - releve du 31/07/2026, « la deuxieme fenetre
+        # n'enregistre pas son emplacement ». Sa POSITION, elle, reste decidee par le compositeur :
+        # sous Wayland un client ne place pas sa propre fenetre (mesure du 27/07/2026 rappelee en
+        # tete de ce fichier), et aucune option de Qt n'y changera rien. 1200x900 n'est que le repli
+        # de la toute premiere ouverture.
+        _geometrie = self.get_conf(self.SMARTOS_CONF_ETATS, default={}).get("double_geometry")
+        if not (_geometrie and fenetre.restoreGeometry(
+                QByteArray().fromHex(str(_geometrie).encode("utf-8")))):
+            fenetre.resize(1200, 900)
+
+        # ⚠ Une QMainWindow neuve n'herite PAS de la feuille de style de l'application : sans ceci
+        # la fenetre s'affiche en theme clair au milieu d'un Spyder sombre (mesure du 27/07/2026).
+        fenetre.setStyleSheet(self.main.styleSheet())
+
+        # ⚠ NI DE SES OPTIONS DE DOCK, et c'est ce qui interdisait la MOSAIQUE. Mesure du
+        # 31/07/2026 : la fenetre principale porte AnimatedDocks|AllowNestedDocks|AllowTabbedDocks,
+        # une fenetre neuve seulement AnimatedDocks|AllowTabbedDocks. Sans AllowNestedDocks, deux
+        # panneaux ne peuvent que s'empiler ou se mettre en onglets, jamais se poser cote a cote -
+        # releve de l'utilisateur, « je voudrais pouvoir reorganiser les dock dans la 2nd fenetre,
+        # avec des dock lateraux, pour pouvoir faire une mosaique ». On RECOPIE celles de la fenetre
+        # principale plutot que d'en ecrire une liste : si Spyder en change un jour, la seconde
+        # fenetre suit sans qu'on ait a le savoir.
+        fenetre.setDockOptions(self.main.dockOptions())
+
+        # ⚠ SANS CECI LA FENETRE N'EST NI DEPLACABLE, NI REDIMENSIONNABLE, NI FERMABLE : la regle
+        # KWin qui supprime la barre de titre vise le TITRE ("^Spyder [-—] .*", cf. TODO cosmetique,
+        # "Fenetres pop-up SANS CADRE") - cette fenetre s'appelle "Spyder — second ecran", donc
+        # matche aussi et perd son cadre natif. C'est le greffon qui equipe - ses boutons, ses
+        # glyphes, son calage - et non nous. Garde les boutons SmartOS plutot que de compter sur le
+        # cadre KWin : la demande utilisateur du 01/08/2026 est de garder la possibilite d'ajouter
+        # d'autres boutons a cette barre plus tard, ce qu'un cadre natif n'offre pas.
+        _controles = self.get_plugin("window_controls", error=False)
+        if _controles is not None:
+            _controles.equip_window(fenetre)
+        else:
+            logger.debug("Greffon window_controls absent : seconde fenetre sans ses controles")
+
+        # Fermer la fenetre revient a quitter le mode : sinon les panneaux resteraient dans une
+        # fenetre detruite, donc invisibles et injoignables.
+        # ⚠ PASSER PAR L'ACTION (`setChecked`), PAS PAR UN APPEL DIRECT A
+        # `_smartos_quitter_deux_ecrans()` (fait dans une version precedente, demande de
+        # l'utilisateur du 01/08/2026) : un appel direct quitte bien le mode mais laisse le bouton
+        # de la barre « Écrans » coche comme si le mode etait toujours actif - `_smartos_basculer_
+        # deux_ecrans()`, qui recale aussi l'icone et le texte du bouton
+        # (`_smartos_rendre_le_bouton`), n'est alors jamais appele. `setChecked(False)` emet
+        # `toggled`, deja connecte a `_smartos_basculer_deux_ecrans` : une seule source de verite,
+        # comme le reste de ce mode. Sans effet de bord si la fenetre est fermee PAR ce meme
+        # bouton (l'action est deja decochee a ce moment-la, `setChecked` ne re-emet rien).
+        fenetre.closeEvent = lambda evenement: (
+            self._smartos_action_ecrans.setChecked(False), evenement.accept()
+        )
+
+        self._smartos_fen2 = fenetre
+        return fenetre
+
+    def _smartos_panneaux_a_droite_de_editeur(self):
+        """
+        Quels panneaux ancrables sont ACTUELLEMENT a droite de l'editeur dans la fenetre
+        principale, releve PAR LA GEOMETRIE REELLE plutot que par une liste figee dans le code -
+        remplace SMARTOS_GROUPES_ECRAN2 (retiree le 01/08/2026, demande de l'utilisateur : il avait
+        du me faire retirer "find_in_files" a la main apres l'avoir deplace a gauche, ce calcul
+        suit desormais sa disposition sans intervention).
+
+        ⚠ DEUX CRITERES PLUS SIMPLES SE SONT REVELES FAUX (releve du 27/07/2026, cf. l'en-tete du
+        patch) : `dockWidgetArea()` repond "gauche" pour TOUS les panneaux, meme ceux a droite ; et
+        la position d'un panneau en onglet NON actif est mappee hors ecran (abscisse negative)
+        alors qu'il se dit visible. La bonne methode, deja eprouvee a l'epoque : regrouper par
+        `tabifiedDockWidgets()` (des onglets d'un meme groupe partagent une position), puis juger
+        le groupe sur la geometrie de son onglet ACTIF (celui dont `visibleRegion()` n'est pas
+        vide).
+        """
+        editeur = self.get_plugin(Plugins.Editor, error=False)
+        if editeur is None or getattr(editeur, "dockwidget", None) is None:
+            return ()
+        _editeur_x = editeur.dockwidget.mapToGlobal(editeur.dockwidget.rect().topLeft()).x()
+
+        _plugin_par_dock = {}
+        for _p in self.get_dockable_plugins():
+            _d = getattr(_p, "dockwidget", None)
+            if _d is not None and _p is not editeur:
+                _plugin_par_dock[_d] = _p
+
+        _deja_vus = set()
+        _groupes = []
+        for _dock, _plugin in _plugin_par_dock.items():
+            if _dock in _deja_vus:
+                continue
+            _compagnons = [_dock] + [
+                _d for _d in self.main.tabifiedDockWidgets(_dock) if _d in _plugin_par_dock
+            ]
+            _deja_vus.update(_compagnons)
+            _actif = next(
+                (_d for _d in _compagnons if not _d.visibleRegion().isEmpty()), _compagnons[0]
+            )
+            _actif_x = _actif.mapToGlobal(_actif.rect().topLeft()).x()
+            if _actif_x > _editeur_x:
+                _groupes.append(tuple(_plugin_par_dock[_d].NAME for _d in _compagnons))
+        return tuple(_groupes)
+
+    def _smartos_groupes_dans_fenetre(self, fenetre):
+        """
+        Les panneaux ACTUELLEMENT dans `fenetre`, regroupes par `tabifiedDockWidgets()` - pour le
+        retour du second ecran vers la fenetre principale, ou TOUT ce qui s'y trouve doit revenir
+        (pas de tri par geometrie a faire, contrairement a l'aller).
+        """
+        from qtpy.QtWidgets import QDockWidget as _SmartosQDockWidget
+
+        _plugin_par_dock = {
+            _p.dockwidget: _p
+            for _p in self.get_dockable_plugins()
+            if getattr(_p, "dockwidget", None) is not None
+        }
+        _docks_ici = [
+            _d for _d in fenetre.findChildren(_SmartosQDockWidget) if _d in _plugin_par_dock
+        ]
+
+        _deja_vus = set()
+        _groupes = []
+        for _dock in _docks_ici:
+            if _dock in _deja_vus:
+                continue
+            _compagnons = [_dock] + [
+                _d for _d in fenetre.tabifiedDockWidgets(_dock) if _d in _plugin_par_dock
+            ]
+            _deja_vus.update(_compagnons)
+            _groupes.append(tuple(_plugin_par_dock[_d].NAME for _d in _compagnons))
+        return tuple(_groupes)
+
+    def _smartos_poser_groupes(self, fenetre, zone, groupes):
+        """
+        Poser `groupes` (tuple de tuples de noms de panneaux) dans `fenetre`, EN ONGLETS.
+
+        ⚠ LE REGROUPEMENT VAUT DANS LES DEUX SENS, et c'est la meme mesure qui l'impose. Poses un
+        par un, dix panneaux s'empilent en colonne : a l'aller ils faisaient une centaine de pixels
+        chacun, illisibles (capture HGIGNORED/bascule_ecran2.png) ; au retour, leur hauteur minimale
+        cumulee force Qt a AGRANDIR la fenetre principale, et le `restoreState` qui suit ne rend que
+        la disposition, jamais la geometrie - d'ou la fenetre « trop grande verticalement » relevee
+        par l'utilisateur le 31/07/2026.
+
+        ⚠ UN PANNEAU DEJA VISIBLE AVANT LA BASCULE PEUT DEVENIR INVISIBLE APRES (releve de
+        l'utilisateur le 01/08/2026, PAS l'inverse - une premiere hypothese le disait absent plutot
+        qu'invisible, ecartee par sa correction). `addDockWidget()` + `.show()` change l'affichage
+        Qt du dock mais PAS le suivi interne de Spyder (celui qui repond a
+        Fenetre > Panneaux) - les deux se desynchronisent des que le dock change de fenetre
+        parente, et le panneau reste marque "visible" en interne sans l'etre reellement a l'ecran.
+        Seul un aller-retour MANUEL par le menu Fenetre le corrigeait, en repassant par le vrai
+        chemin de code de Spyder. On rejoue ici ce meme aller-retour programmatiquement
+        (`toggle_view`, la methode que ce menu appelle lui-meme) plutot que d'inventer une
+        resynchronisation maison.
+        """
+        for _groupe in groupes:
+            _premier = None
+            for _nom in _groupe:
+                _greffon = self.get_plugin(_nom, error=False)
+                _dock = None if _greffon is None else getattr(_greffon, "dockwidget", None)
+                if _dock is None:
+                    continue
+                fenetre.addDockWidget(zone, _dock)
+                if _premier is None:
+                    _premier = _dock
+                else:
+                    fenetre.tabifyDockWidget(_premier, _dock)
+                # ⚠ addDockWidget NE MONTRE PAS : le dock garde son etat d'affichage anterieur.
+                _dock.show()
+                # Resynchronise le suivi interne de Spyder (cf. docstring) - meme aller-retour que
+                # le menu Fenetre > Panneaux, qui appelle cette meme methode.
+                try:
+                    _greffon.toggle_view(False)
+                    _greffon.toggle_view(True)
+                except Exception:
+                    logger.debug(
+                        "Resynchronisation de visibilite impossible pour %s", _nom, exc_info=True)
+            if _premier is not None:
+                # Le premier de chaque groupe devient l'onglet actif, comme dans la disposition
+                # d'origine.
+                _premier.raise_()
+
+    def _smartos_dock_dans_ecran2(self, dock):
+        """Vrai si ce dock vit dans la seconde fenetre."""
+        fenetre = getattr(self, "_smartos_fen2", None)
+        return fenetre is not None and dock is not None and fenetre.isAncestorOf(dock)
+
+    # SmartOS (patch_spyder_deux_ecrans_maximize.py) : quelle fenetre agrandir dans, et le repli
+    # du second ecran quand rien n'a le focus dedans. Cf. l'en-tete du patch pour le contexte.
+
+    def _smartos_fenetre_du_focus(self, focus_widget):
+        """La fenetre (principale ou second ecran) qui contient le widget focalise."""
+        fenetre2 = getattr(self, "_smartos_fen2", None)
+        if (fenetre2 is not None and focus_widget is not None
+                and fenetre2.isAncestorOf(focus_widget)):
+            return fenetre2
+        return self.main
+
+    def _smartos_premier_panneau_ecran2(self):
+        """Premier panneau encore present dans le second ecran, ou None."""
+        _noms = self._smartos_noms_panneaux_ecran2()
+        return self.get_plugin(_noms[0], error=False) if _noms else None
+
+    def _smartos_noms_panneaux_ecran2(self):
+        """
+        Noms des panneaux ACTUELLEMENT dans le second ecran, releves par ancrage plutot que par
+        une liste figee - remplace SMARTOS_PANNEAUX_ECRAN2 (retiree le 01/08/2026 avec
+        SMARTOS_GROUPES_ECRAN2, meme raison : suivre la disposition reelle plutot qu'une liste a
+        maintenir a la main). Vide si le mode n'est pas actif.
+        """
+        fenetre = getattr(self, "_smartos_fen2", None)
+        if fenetre is None:
+            return ()
+        return tuple(
+            _p.NAME for _p in self.get_dockable_plugins()
+            if self._smartos_dock_dans_ecran2(getattr(_p, "dockwidget", None))
+        )
+
+    def _smartos_basculer_deux_ecrans(self, actif):
+        """Entrer dans le mode deux ecrans, ou en sortir."""
+        try:
+            if actif:
+                self._smartos_entrer_deux_ecrans()
+            else:
+                self._smartos_quitter_deux_ecrans()
+            self._smartos_rendre_le_bouton(actif)
+        except Exception:
+            # Un mode d'affichage ne doit jamais emporter Spyder avec lui.
+            logger.exception("Bascule du mode deux ecrans impossible")
+        self._smartos_recentrer_rangee()
+
+    def _smartos_recentrer_rangee(self):
+        """
+        Rejouer le centrage du groupe du milieu (publie sur main par patch_spyder_burger_menu.py).
+
+        La bascule passe par restoreState() SANS redimensionner la fenetre principale (le second
+        ecran a sa PROPRE fenetre) : sig_resized ne tire donc pas, et la DragArea gauche garderait
+        la largeur figee calculee dans l'autre mode - les boutons du milieu ne revenaient pas au
+        milieu en sortant du mode deux ecrans (releve utilisateur du 08/08/2026). Deux passes
+        differees, comme au demarrage : les largeurs des barres ne sont definitives qu'une fois la
+        rangee reposee par la boucle d'evenements.
+        """
+        recentrer = getattr(self.main, "_smartos_recentrer_barres", None)
+        if recentrer is None:
+            return
+        from qtpy.QtCore import QTimer as _SmartosQTimerEcrans
+        _SmartosQTimerEcrans.singleShot(0, recentrer)
+        _SmartosQTimerEcrans.singleShot(400, recentrer)
+
+    def _smartos_entrer_deux_ecrans(self):
+        from qtpy.QtCore import Qt as _SmartosQt
+        from qtpy.QtGui import QGuiApplication as _SmartosQGuiApplication
+
+        if getattr(self, "_smartos_fen2", None) is not None:
+            return
+
+        # Memoriser la disposition mono-ecran AVANT de la defaire : c'est elle qu'on rendra en
+        # sortant, et c'est la moitie « mono » des deux configurations demandees.
+        etats = dict(self.get_conf(self.SMARTOS_CONF_ETATS, default={}))
+        etats["mono"] = qbytearray_to_str(self.main.saveState(version=WINDOW_STATE_VERSION))
+
+        fenetre = self._smartos_creer_fenetre_ecran2()
+        self._smartos_poser_groupes(
+            fenetre, _SmartosQt.LeftDockWidgetArea, self._smartos_panneaux_a_droite_de_editeur()
+        )
+
+        # ⚠ _last_plugin SURVIT d'un agrandissement a l'autre : s'il designe un panneau qui vient de
+        # partir, le prochain agrandissement le tirerait dans la fenetre principale.
+        if self._last_plugin is not None and self._smartos_dock_dans_ecran2(
+                getattr(self._last_plugin, "dockwidget", None)):
+            self._last_plugin = None
+
+        # ⚠ DESIGNER L'ECRAN AVANT LE PREMIER AFFICHAGE, ET NON APRES. On ne PLACE pas la fenetre -
+        # sous Wayland move() est ignore, c'est mesure - mais on peut dire sur QUEL ECRAN elle doit
+        # naitre. Encore faut-il le dire au bon moment : le compositeur en tient compte a la
+        # CREATION de la surface, et `setScreen` sur une fenetre deja mappee est au mieux une
+        # suggestion qu'il ignore. La premiere version appelait show() puis setScreen() ; l'ordre
+        # est desormais inverse, et c'est QWidget.setScreen qui s'en charge - il recree la fenetre
+        # si besoin, ce que la poignee brute ne fait pas.
+        #
+        # ⚠ ET PAS DE showFullScreen. Il etait pose ici « puisqu'on a un ecran dedie » ; il rendrait
+        # inutile la taille memorisee ci-dessus, que l'utilisateur a demandee le meme jour. Le
+        # plein ecran reste a un clic, et restoreGeometry le memorise comme le reste.
+        _ecrans = _SmartosQGuiApplication.screens()
+        if len(_ecrans) > 1:
+            _autres = [e for e in _ecrans if e is not self.main.screen()]
+            if _autres:
+                fenetre.setScreen(_autres[0])
+        fenetre.show()
+
+        # Restaurer la disposition double-ecran si on en a deja une.
+        if etats.get("double_screen_1"):
+            self.main.restoreState(
+                QByteArray().fromHex(str(etats["double_screen_1"]).encode("utf-8")),
+                version=WINDOW_STATE_VERSION,
+            )
+        if etats.get("double_screen_2"):
+            fenetre.restoreState(
+                QByteArray().fromHex(str(etats["double_screen_2"]).encode("utf-8"))
+            )
+
+        # ⚠ REMONTER LES POIGNEES DE REDIMENSIONNEMENT, ICI, SANS ATTENDRE D'EVENEMENT. Le greffon
+        # window_controls les remonte au-dessus du contenu par un filtre d'evenements de la
+        # fenetre ; poser dix panneaux d'un coup les recouvre, et le filtre ne rattrape qu'au tour
+        # de boucle suivant. Mesure du 31/07/2026, la seule qui tranche : SANS cette relance, six
+        # poignees sur huit restent sous les onglets ; avec, huit sur huit, sur trois essais.
+        _poignees = getattr(fenetre, "_window_controls_grips", None)
+        if _poignees is not None:
+            _poignees.reposition()
+
+
+        self.set_conf(self.SMARTOS_CONF_ETATS, etats)
+        self.set_conf(self.SMARTOS_CONF_MODE, True)
+
+    def _smartos_quitter_deux_ecrans(self):
+        from qtpy.QtCore import Qt as _SmartosQt
+
+        fenetre = getattr(self, "_smartos_fen2", None)
+        if fenetre is None:
+            return
+
+        # Memoriser la disposition double-ecran AVANT de la defaire : c'est l'autre moitie.
+        etats = dict(self.get_conf(self.SMARTOS_CONF_ETATS, default={}))
+        etats["double_screen_1"] = qbytearray_to_str(
+            self.main.saveState(version=WINDOW_STATE_VERSION)
+        )
+        etats["double_screen_2"] = qbytearray_to_str(fenetre.saveState())
+        etats["double_geometry"] = qbytearray_to_str(fenetre.saveGeometry())
+
+        # Relever AVANT de couper la reference : _smartos_groupes_dans_fenetre lit `fenetre`
+        # directement (variable locale), mais autant le faire pendant que tout est encore en place.
+        _groupes = self._smartos_groupes_dans_fenetre(fenetre)
+
+        # closeEvent rappelle cette methode : couper la reference AVANT de reposer les panneaux,
+        # sinon _smartos_dock_dans_ecran2 les croirait encore de l'autre cote.
+        self._smartos_fen2 = None
+
+        self._smartos_poser_groupes(self.main, _SmartosQt.RightDockWidgetArea, _groupes)
+
+        if etats.get("mono"):
+            self.main.restoreState(
+                QByteArray().fromHex(str(etats["mono"]).encode("utf-8")),
+                version=WINDOW_STATE_VERSION,
+            )
+
+        fenetre.closeEvent = lambda evenement: evenement.accept()
+        fenetre.close()
+        fenetre.deleteLater()
+
+        self.toggle_lock(self._interface_locked)
+
+        self.set_conf(self.SMARTOS_CONF_ETATS, etats)
+        self.set_conf(self.SMARTOS_CONF_MODE, False)
+
+    def _smartos_poser_barre_deux_ecrans(self):
+        """
+        La « nouvelle barre d'outils » demandee, avec son bouton de bascule.
+
+        ⚠ UNE BARRE D'APPLICATION DECLAREE AU GREFFON Toolbar, ET SURTOUT PAS UNE QToolBar NUE.
+        Les deux premieres versions en posaient une a la main, et les deux ont casse la rangee du
+        haut - c'est le releve de l'utilisateur du 31/07/2026, « les outils se retrouvent a droite
+        au lieu d'etre centres et la fenetre est trop grande verticalement ». La raison tient en
+        une ligne : le centrage de cette rangee est CALCULE par patch_spyder_burger_menu.py
+        (largeur de la DragArea gauche = W/2 - epingle a gauche - groupe/2), et ce calcul ne
+        parcourt que `toolbarslist`, la liste des barres DECLAREES. Une barre nue occupe donc de la
+        place sans etre comptee, et pousse tout le groupe.
+        La parade evidente - addToolBarBreak, une rangee a soi - a ete essayee et MESUREE, elle est
+        pire : _place_left reordonne la rangee par insertToolBar, et les controles de fenetre
+        descendent avec la nouvelle rangee (releve du 31/07/2026, barre window_controls_toolbar a
+        y=50 au lieu de y=0). Se declarer est la seule voie qui ne demande a corriger personne.
+
+        Deux consequences de faire cela TARD (ce travail est differe d'un tour de boucle pour
+        passer apres tous les on_mainwindow_visible) :
+          - le container a deja rendu les barres : il faut appeler render() nous-memes ;
+          - la barre s'ajoute en bout de rangee, donc apres les controles de fenetre : on l'insere
+            juste avant eux, pour qu'ils restent l'element le plus a droite.
+        """
+        if getattr(self, "_smartos_barre_ecrans", None) is not None:
+            return
+
+        greffon_barres = self.get_plugin(Plugins.Toolbar, error=False)
+        if greffon_barres is None:
+            logger.debug("Greffon Toolbar absent : barre « Écrans » non posee")
+            return
+
+        action = self.create_action(
+            "smartos_toggle_two_screens",
+            text=_("Mode deux écrans"),
+            tip=_("Déplacer les panneaux de droite dans une fenêtre pour le second écran"),
+            toggled=self._smartos_basculer_deux_ecrans,
+            register_action=False,
+        )
+
+        barre = greffon_barres.create_application_toolbar(
+            self.SMARTOS_BARRE_ECRANS, _("Écrans")
+        )
+        greffon_barres.add_item_to_application_toolbar(
+            action, toolbar_id=self.SMARTOS_BARRE_ECRANS, omit_id=True
+        )
+        barre.render()
+
+        # ⚠ FOND GRISE QUAND LE BOUTON EST COCHE : cf. `_smartos_rendre_transparent` plus bas pour
+        # le detail et les deux pieges deja payes. Applique ICI une premiere fois, mais ce n'est
+        # PAS SUFFISANT A SOI SEUL (releve de l'utilisateur le 01/08/2026, toujours gris malgre ce
+        # premier appel) - `_smartos_rendre_le_bouton`, rejouee a chaque bascule, la reapplique.
+        self._smartos_rendre_transparent(barre.widgetForAction(action))
+
+        # ⚠ ET RECOPIER L'ETAT VERROUILLE D'UNE BARRE EXISTANTE. Le verrouillage de l'interface
+        # n'est pas une propriete que Qt propage : le greffon Toolbar le REJOUE sur les barres qu'il
+        # connait, et il l'a fait avant que la notre existe. Elle nait donc MOBILE et affiche sa
+        # poignee de deplacement, seule de la rangee - releve de l'utilisateur le 31/07/2026.
+        # C'est le troisieme etat, apres la visibilite et le centrage, qu'une barre declaree tard
+        # doit aller chercher elle-meme. patch_spyder_burger_menu.py fait deja exactement cela pour
+        # sa propre barre nue.
+        for _autre in greffon_barres.toolbarslist:
+            if _autre is barre:
+                continue
+            barre.setMovable(_autre.isMovable())
+            break
+
+        # ⚠ A GAUCHE, COLLEE A « Fichiers », et pas seulement deplacee la : demande de l'utilisateur
+        # du 31/07/2026. Une barre posee a gauche sans le DIRE serait comptee dans le groupe centre
+        # par patch_spyder_burger_menu.py, qui la ferait alors decaler de sa propre largeur. On
+        # s'annonce donc comme EPINGLEE A GAUCHE - la liste est ouverte, l'autre patch la relit a
+        # chaque calcul - et c'est lui qui place la barre au bon endroit de la rangee.
+        _epingles = tuple(getattr(self.main, "_smartos_barres_epinglees_gauche", ()))
+        if self.SMARTOS_BARRE_ECRANS not in _epingles:
+            self.main._smartos_barres_epinglees_gauche = _epingles + (self.SMARTOS_BARRE_ECRANS,)
+
+        # ⚠ TROISIEME CONSEQUENCE, ET LA PLUS SOURNOISE : la barre nait CACHEE. Mesure du
+        # 31/07/2026 - elle existe, elle est rendue, elle est placee, sa geometrie vaut 72x50 en
+        # x=876, et `isVisible()` rend False. Un bouton parfaitement construit et invisible, soit
+        # exactement ce dont l'utilisateur s'est plaint la veille : « je ne peux rien confirmer, si
+        # je n'ai aucun bouton ». C'est load_last_visible_toolbars() qui cache tout ce qui n'est pas
+        # dans `last_visible_toolbars`, et elle passe APRES nous : notre travail est differe d'un
+        # tour de boucle, mais le demarrage de Spyder appelle processEvents(), si bien que ce tour
+        # de boucle tombe AVANT le on_mainwindow_visible du greffon Toolbar.
+        #
+        # D'ou les deux moities, une par ordre d'execution possible - et il en faut bien deux,
+        # aucune ne couvrant les deux cas : la conf si le greffon Toolbar passe apres nous (c'est
+        # LUI qui montrera la barre, par son propre mecanisme), le setVisible s'il est deja passe.
+        _noms = list(self.get_conf("last_visible_toolbars", default=[], section="toolbar"))
+        if self.SMARTOS_BARRE_ECRANS not in _noms:
+            _noms.append(self.SMARTOS_BARRE_ECRANS)
+            self.set_conf("last_visible_toolbars", _noms, section="toolbar")
+        barre.setVisible(True)
+
+        self._smartos_barre_ecrans = barre
+        self._smartos_action_ecrans = action
+        self._smartos_rendre_le_bouton(False)
+
+    def _smartos_rendre_transparent(self, bouton):
+        """
+        Forcer un fond transparent, y compris a l'etat coche, sur CE bouton precis.
+
+        ⚠ DEUX PIEGES, chacun paye avant de comprendre. 1) Un selecteur de type nu
+        (`QToolButton:checked`) ne suffit pas : Spyder pose sa propre feuille de style au niveau
+        de l'application, avec un selecteur plus SPECIFIQUE qui l'emporte quel que soit l'ordre
+        d'application - releve de l'utilisateur le 01/08/2026, fond gris persistant malgre ce
+        style. Nom d'objet UNIQUE + selecteur d'ID (`#nom:checked`), qui l'emporte en specificite
+        CSS. 2) POSER LE STYLE UNE SEULE FOIS, A LA CREATION DU BOUTON, N'A PAS SUFFI NON PLUS -
+        toujours gris malgre le selecteur d'ID. Diagnostic en direct : le bouton qu'on style au
+        moment de creer la barre (`_smartos_poser_barre_deux_ecrans`) n'a NI objectName NI
+        styleSheet quand on l'inspecte ensuite - `render()` est rejoue plus tard par le greffon
+        Toolbar lui-meme (deja documente juste au-dessus : « la conf si le greffon Toolbar passe
+        apres nous »), qui RECONSTRUIT le QToolButton depuis l'action, effacant tout ce qu'on avait
+        pose sur l'ancien. D'ou cette methode SEPAREE, REJOUEE a chaque bascule par
+        `_smartos_rendre_le_bouton` (qui tourne de toute facon a chaque clic) plutot qu'une seule
+        fois a la creation - le bouton, quel qu'il soit a cet instant, est alors forcement le bon.
+        """
+        if bouton is None:
+            return
+        bouton.setObjectName("smartos_bouton_deux_ecrans")
+        bouton.setStyleSheet(
+            "QToolButton#smartos_bouton_deux_ecrans"
+            " { background-color: transparent; border: none; } "
+            "QToolButton#smartos_bouton_deux_ecrans:checked"
+            " { background-color: transparent; border: none; } "
+            "QToolButton#smartos_bouton_deux_ecrans:hover"
+            " { background-color: transparent; border: none; } "
+            "QToolButton#smartos_bouton_deux_ecrans:pressed"
+            " { background-color: transparent; border: none; }"
+        )
+
+    def _smartos_rendre_le_bouton(self, actif):
+        """
+        Donner au bouton l'aspect de CE QU'IL FERA au prochain clic, et non de l'etat courant.
+
+        Demande de l'utilisateur du 31/07/2026 : « je ne trouve pas l'icone pour lancer la 2eme
+        fenetre tres adaptee, et il faudrait qu'elle change pour permettre un retour plus explicite
+        sur une fenetre ». Deux moniteurs quand on est sur un ecran, un seul moniteur quand on est
+        sur deux : c'est la convention du bouton maximiser/restaurer, que le greffon
+        window_controls applique deja a ses propres boutons.
+
+        Les icones viennent de qtawesome et non de create_icon() : le jeu interne de Spyder n'a
+        rien qui parle d'ECRANS, et « dock » - ce qui etait pose ici - decrit un panneau ancre,
+        c'est-a-dire tout autre chose.
+        """
+        _action = getattr(self, "_smartos_action_ecrans", None)
+        if _action is None:
+            return
+        import qtawesome as _qta
+        from spyder.utils.icon_manager import ima as _ima
+        _action.setIcon(_qta.icon("mdi.monitor" if actif else "mdi.monitor-multiple",
+                                  color=_ima.MAIN_FG_COLOR))
+        _action.setText(_("Revenir à une fenêtre") if actif else _("Mode deux écrans"))
+        _action.setToolTip(
+            _("Rapatrier les panneaux du second écran dans la fenêtre principale") if actif
+            else _("Déplacer les panneaux de droite dans une fenêtre pour le second écran"))
+
+        # ⚠ REJOUE A CHAQUE BASCULE, PAS UNE SEULE FOIS A LA CREATION : cf.
+        # `_smartos_rendre_transparent` pour le pourquoi (le bouton peut avoir ete reconstruit par
+        # le greffon Toolbar entre-temps).
+        _barre = getattr(self, "_smartos_barre_ecrans", None)
+        if _barre is not None:
+            self._smartos_rendre_transparent(_barre.widgetForAction(_action))
+
+    def _smartos_installer_deux_ecrans(self):
+        """
+        Point d'entree du mode, appele une fois l'interface visible.
+
+        Pose la barre, puis REND LE MODE s'il etait actif a la fermeture precedente - sans quoi
+        l'utilisateur retrouverait ses panneaux rapatries a chaque demarrage, et le « souvenir »
+        des deux dispositions ne servirait a rien.
+        """
+        try:
+            self._smartos_poser_barre_deux_ecrans()
+            if self.get_conf(self.SMARTOS_CONF_MODE, default=False):
+                # setChecked declenche `toggled`, donc la bascule : une seule source de verite.
+                self._smartos_action_ecrans.setChecked(True)
+        except Exception:
+            logger.exception("Mode deux ecrans non installe")
+
     def maximize_dockwidget(self, restore=False):
         """
         Maximize current dockwidget.
@@ -762,28 +1697,59 @@ class Layout(SpyderPluginV2, SpyderShortcutsMixin):
                 return
 
             # Select plugin to maximize
-            self._state_before_maximizing = self.main.saveState(
+            focus_widget = QApplication.focusWidget()
+            # SmartOS (patch_spyder_deux_ecrans_maximize.py) : un clic sur le bouton "Agrandir"
+            # d'un panneau (patch_spyder_pane_maximize_button.py) fixe le focus PUIS bascule
+            # l'action dans le MEME clic, synchrone - QApplication.focusWidget() n'a pas encore
+            # eu le temps de refleter ce changement (visible seulement apres un tour de boucle
+            # Qt). Le bouton a donc deja laisse ICI, explicitement, le panneau qu'il vise -
+            # on lui fait confiance a la place d'un focus pas encore a jour, consomme en une fois.
+            _smartos_bouton_cible = getattr(self, "_smartos_bouton_agrandir_cible", None)
+            self._smartos_bouton_agrandir_cible = None
+            if _smartos_bouton_cible is not None:
+                focus_widget = _smartos_bouton_cible.get_widget()
+            # SmartOS (patch_spyder_deux_ecrans_maximize.py) : agrandir DANS LA FENETRE QUI A LE
+            # FOCUS (principale ou second ecran), et non plus toujours dans la principale - cf.
+            # l'en-tete de ce patch pour le bug que corrige ce remplacement.
+            self._smartos_fenetre_agrandie = self._smartos_fenetre_du_focus(focus_widget)
+            _smartos_cible_ecran2 = (
+                self._smartos_fenetre_agrandie is getattr(self, "_smartos_fen2", None)
+            )
+            self._state_before_maximizing = self._smartos_fenetre_agrandie.saveState(
                 version=WINDOW_STATE_VERSION
             )
-            focus_widget = QApplication.focusWidget()
 
             for plugin in self.get_dockable_plugins():
+                # SmartOS (patch_spyder_deux_ecrans.py / _maximize.py) : ne cacher et ne proposer
+                # comme candidat que les panneaux de la fenetre VISEE - jamais ceux de l'autre.
+                if self._smartos_dock_dans_ecran2(plugin.dockwidget) != _smartos_cible_ecran2:
+                    continue
                 plugin.dockwidget.hide()
-                if plugin.get_widget().isAncestorOf(focus_widget):
+                # ⚠ isAncestorOf(x) rend FAUX quand x EST l'objet lui-meme (Qt : un widget n'est
+                # pas son propre ancetre) - sans le "is", le cas du bouton (focus_widget vaut le
+                # widget du PANNEAU lui-meme, cf. plus haut) ne matchait jamais rien.
+                if plugin.get_widget() is focus_widget or plugin.get_widget().isAncestorOf(focus_widget):
                     self._last_plugin = plugin
 
             # This prevents a possible error when the value of _last_plugin
             # turns out to be None.
             if self._last_plugin is None:
-                # Use the Editor as default plugin to maximize
-                if editor is not None:
+                # SmartOS (patch_spyder_deux_ecrans_maximize.py) : le repli sur l'Editeur n'a de
+                # sens que si la fenetre visee est la PRINCIPALE - l'Editeur n'est jamais envoye
+                # vers le second ecran. Y retomber quand meme
+                # agrandirait un panneau d'une autre fenetre que celle qu'on regarde : exactement
+                # le bug rapporte.
+                if not _smartos_cible_ecran2 and editor is not None:
                     self._last_plugin = editor
                 else:
+                    self._last_plugin = self._smartos_premier_panneau_ecran2()
+                if self._last_plugin is None:
+                    self._state_before_maximizing = None
                     return
 
             # Maximize last_plugin
             self._last_plugin.dockwidget.toggleViewAction().setDisabled(True)
-            self.main.setCentralWidget(self._last_plugin.get_widget())
+            self._smartos_fenetre_agrandie.setCentralWidget(self._last_plugin.get_widget())
             self._last_plugin.get_widget().set_maximized_state(True)
 
             # Workaround to solve an issue with editor's outline explorer:
@@ -802,11 +1768,12 @@ class Layout(SpyderPluginV2, SpyderShortcutsMixin):
                 self._last_plugin.get_widget()
             )
             self._last_plugin.dockwidget.toggleViewAction().setEnabled(True)
-            self.main.setCentralWidget(None)
+            self._smartos_fenetre_agrandie.setCentralWidget(None)
             self._last_plugin.get_widget().set_maximized_state(False)
-            self.main.restoreState(
+            self._smartos_fenetre_agrandie.restoreState(
                 self._state_before_maximizing, version=WINDOW_STATE_VERSION
             )
+            self._smartos_fenetre_agrandie = None
             self._state_before_maximizing = None
 
             if self._last_plugin is editor:

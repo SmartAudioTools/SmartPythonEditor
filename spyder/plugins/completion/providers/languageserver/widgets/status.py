@@ -140,7 +140,11 @@ class LSPStatusWidget(StatusBarWidget):
                     ClientStatus.STARTING
                 )
                 self.set_status(lsp_language, status)
-                self.setVisible(True)
+                # LSP (SmartOS, patch_spyder_statusbar_enable.py) : n'afficher que si
+                # statusbar/lsp_status/enable est vrai (masque par defaut).
+                from spyder.config.manager import CONF as _smartos_CONF
+                self.setVisible(bool(
+                    _smartos_CONF.get("statusbar", "lsp_status/enable", True)))
             return
 
         # Don't update the status in case the editor and LSP languages
@@ -150,7 +154,11 @@ class LSPStatusWidget(StatusBarWidget):
             return
         else:
             self.set_status(self.current_language, status)
-            self.setVisible(True)
+            # LSP (SmartOS, patch_spyder_statusbar_enable.py) : n'afficher que si
+            # statusbar/lsp_status/enable est vrai (masque par defaut).
+            from spyder.config.manager import CONF as _smartos_CONF
+            self.setVisible(bool(
+                _smartos_CONF.get("statusbar", "lsp_status/enable", True)))
 
     def set_current_language(self, language):
         self.current_language = language

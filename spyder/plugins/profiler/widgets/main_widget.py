@@ -72,6 +72,18 @@ class ProfilerWidgetMainToolbarSections:
     Stop = "stop_section"
 
 
+class ProfilerWidgetOptionsMenuSections:
+    """SmartOS (patch_spyder_profiler_toolbar.py) : sections du menu burger du Profileur, qui
+    n'en avait aucune - son menu ne contenait que les quatre actions de dock ajoutees d'office
+    par PluginMainWidget."""
+    Display = "display_section"
+    Data = "data_section"
+    #: SmartOS (2e passe, 26/07/2026) : "Reduire" et "Etendre", retires de la barre.
+    Tree = "tree_section"
+    #: SmartOS (3e passe, 26/07/2026) : "Arreter le profilage", retire de la barre.
+    StopProfiling = "stop_profiling_section"
+
+
 # --- Widgets
 # ----------------------------------------------------------------------------
 class ProfilerWidget(ShellConnectMainWidget):
@@ -227,17 +239,14 @@ class ProfilerWidget(ShellConnectMainWidget):
         #         section=ProfilerWidgetMainToolbarSections.BrowseView,
         #     )
 
-        for action in [collapse_action, expand_action]:
-            self.add_item_to_toolbar(
-                action,
-                toolbar=main_toolbar,
-                section=ProfilerWidgetMainToolbarSections.ExpandCollapse,
-            )
+        # SmartOS (2e passe, 26/07/2026) : "Reduire" et "Etendre" ne sont plus dans la barre,
+        # ils sont passes dans le menu burger (cf. plus bas). L'arbre se plie et se deplie aussi a
+        # la souris, sur ses propres chevrons.
 
+        # SmartOS (patch_spyder_profiler_toolbar.py) : seul "Rechercher" reste dans la barre.
+        # Les trois bascules d'affichage partent dans le menu burger (cf. plus bas) : ce sont des
+        # reglages de vue, choisis une fois, pas des commandes du quotidien.
         for action in [
-            slow_local_action,
-            toggle_builtins_action,
-            callers_or_callees_action,
             search_action
         ]:
             self.add_item_to_toolbar(
@@ -246,15 +255,52 @@ class ProfilerWidget(ShellConnectMainWidget):
                 section=ProfilerWidgetMainToolbarSections.ChangeView,
             )
 
-        self.add_item_to_toolbar(
-            stop_action,
-            toolbar=main_toolbar,
-            section=ProfilerWidgetMainToolbarSections.Stop,
-        )
+        # SmartOS (3e passe, 26/07/2026) : "Arreter le profilage" ne reste pas dans la barre, il
+        # passe dans le menu burger (cf. plus bas). La barre "Stop" du greffon
+        # spyder_stop_toolbar porte desormais un bouton global qui arrete aussi le profilage,
+        # avec le debogage, l'execution et l'analyse de code : le bouton local devient un secours.
+        # Consequence voulue : la barre n'a plus qu'une section (Rechercher), donc plus de
+        # separateur - le trait entre la loupe et le stop que l'item 5 demandait de supprimer.
 
-        # ---- Corner widget
+        # ---- Menu burger (options)
+        # SmartOS (patch_spyder_profiler_toolbar.py) : tout ce qui a quitte la barre et le coin
+        # atterrit ici. Deux sections, donc separees par un trait ; les actions de dock
+        # (Deplacer/Detacher/Ancrer/Fermer) restent en dernier, PluginMainWidgetOptionsMenu.render()
+        # reservant toujours la section Bottom a celles-la.
+        options_menu = self.get_options_menu()
+
+        # SmartOS (2e passe, 26/07/2026) : le pliage d'un niveau d'arbre, retire de la barre.
+        for action in [collapse_action, expand_action]:
+            self.add_item_to_menu(
+                action,
+                menu=options_menu,
+                section=ProfilerWidgetOptionsMenuSections.Tree,
+            )
+        for action in [
+            slow_local_action,
+            toggle_builtins_action,
+            callers_or_callees_action,
+        ]:
+            self.add_item_to_menu(
+                action,
+                menu=options_menu,
+                section=ProfilerWidgetOptionsMenuSections.Display,
+            )
+
         for action in [save_action, load_action, clear_action]:
-            self.add_corner_widget(action, before=self._options_button)
+            self.add_item_to_menu(
+                action,
+                menu=options_menu,
+                section=ProfilerWidgetOptionsMenuSections.Data,
+            )
+
+        # SmartOS (3e passe, 26/07/2026) : "Arreter le profilage", retire de la barre par la 3e passe.
+        # En derniere section propre au panneau, juste avant les actions de dock.
+        self.add_item_to_menu(
+            stop_action,
+            menu=options_menu,
+            section=ProfilerWidgetOptionsMenuSections.StopProfiling,
+        )
 
         # ---- Context menu actions
         show_callees_action = self.create_action(

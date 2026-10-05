@@ -234,11 +234,13 @@ class WorkingDirectoryContainer(PluginMainContainer):
             triggered=self._parent_directory,
         )
 
+        # SmartOS: barre repertoire courant reduite au combo (cf.
+        # Commun/scripts/patch_spyder_workingdir_bar_trim.py). "Aller au repertoire parent" retire
+        # (doublon du "Parent" de l'Explorer) ; "Selectionner un repertoire de travail" deplace dans
+        # la barre de l'Explorer (avant Parent, au deplacement). Les deux actions restent creees.
         for item in [
             spacer,
             self.pathedit,
-            self.browse_action,
-            self.parent_action,
         ]:
             self.add_item_to_toolbar(
                 item,

@@ -22,7 +22,15 @@ except Exception:
 from jupyter_client.kernelspec import KernelSpec
 from packaging.version import parse
 from qtpy.QtCore import QEventLoop, QProcess
-from requests.structures import CaseInsensitiveDict
+
+
+# Ajout SmartOS (_smartos_lazy_demarrage:requests.structures) : requests n'est importe
+# qu'a la construction (Windows seulement). Voir patch_spyder_lazy_imports_demarrage.py.
+def CaseInsensitiveDict(*args, **kwargs):
+    from requests.structures import CaseInsensitiveDict as _CaseInsensitiveDict
+    return _CaseInsensitiveDict(*args, **kwargs)
+
+
 from spyder_kernels.utils.pythonenv import (
     get_conda_env_path,
     get_pixi_manifest_path_and_env_name,

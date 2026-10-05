@@ -36,6 +36,26 @@ from spyder.plugins.outlineexplorer.api import OutlineExplorerData
 from spyder.utils.qstringhelpers import qstring_length
 
 
+# ---- SmartOS (_SmartosRegexParesseuse) : motifs de coloration compiles a la demande -------------
+# Les compiler tous a l'import coutait 30 ms pour un ou deux motifs utilises. Voir
+# spyder_patch/patch_spyder_regex_coloration_paresseuses.py du generator.
+class _SmartosRegexParesseuse:
+    """Attribut de classe : re.compile(*arguments) a la premiere lecture, puis l'objet compile."""
+
+    def __init__(self, *arguments):
+        self.arguments = arguments
+
+    def __set_name__(self, classe, nom):
+        self.nom = nom
+
+    def __get__(self, instance, classe):
+        motif = re.compile(*self.arguments)
+        for parente in classe.__mro__:
+            if parente.__dict__.get(self.nom) is self:
+                setattr(parente, self.nom, motif)
+        return motif
+
+
 
 # =============================================================================
 # Constants
@@ -510,7 +530,7 @@ class PythonSH(BaseSH):
     """Python Syntax Highlighter"""
     # Syntax highlighting rules:
     add_kw = ['async', 'await']
-    PROG = re.compile(make_python_patterns(additional_keywords=add_kw), re.S)
+    PROG = _SmartosRegexParesseuse(make_python_patterns(additional_keywords=add_kw), re.S)
     IDPROG = re.compile(r"\s+(\w+)", re.S)
     ASPROG = re.compile(r"\b(as)\b")
 
@@ -715,7 +735,7 @@ class PythonSH(BaseSH):
 class IPythonSH(PythonSH):
     """IPython Syntax Highlighter"""
     add_kw = ['async', 'await']
-    PROG = re.compile(make_ipython_patterns(additional_keywords=add_kw), re.S)
+    PROG = _SmartosRegexParesseuse(make_ipython_patterns(additional_keywords=add_kw), re.S)
 
 
 #==============================================================================
@@ -732,7 +752,7 @@ class CythonSH(PythonSH):
 
     ADDITIONAL_BUILTINS = C_TYPES.split() + [
         "array", "bint", "Py_ssize_t", "intern", "reload", "sizeof", "NULL"]
-    PROG = re.compile(make_python_patterns(ADDITIONAL_KEYWORDS,
+    PROG = _SmartosRegexParesseuse(make_python_patterns(ADDITIONAL_KEYWORDS,
                                            ADDITIONAL_BUILTINS), re.S)
     IDPROG = re.compile(r"\s+([\w\.]+)", re.S)
 
@@ -745,7 +765,7 @@ class EnamlSH(PythonSH):
     ADDITIONAL_KEYWORDS = ["enamldef", "template", "attr", "event", "const", "alias",
                            "func"]
     ADDITIONAL_BUILTINS = []
-    PROG = re.compile(make_python_patterns(ADDITIONAL_KEYWORDS,
+    PROG = _SmartosRegexParesseuse(make_python_patterns(ADDITIONAL_KEYWORDS,
                                            ADDITIONAL_BUILTINS), re.S)
     IDPROG = re.compile(r"\s+([\w\.]+)", re.S)
 
@@ -787,7 +807,7 @@ def make_cpp_patterns():
 class CppSH(BaseSH):
     """C/C++ Syntax Highlighter"""
     # Syntax highlighting rules:
-    PROG = re.compile(make_cpp_patterns(), re.S)
+    PROG = _SmartosRegexParesseuse(make_cpp_patterns(), re.S)
     # Syntax highlighting states (from one text block to another):
     NORMAL = 0
     INSIDE_COMMENT = 1
@@ -845,7 +865,7 @@ def make_opencl_patterns():
 
 class OpenCLSH(CppSH):
     """OpenCL Syntax Highlighter"""
-    PROG = re.compile(make_opencl_patterns(), re.S)
+    PROG = _SmartosRegexParesseuse(make_opencl_patterns(), re.S)
 
 
 #==============================================================================
@@ -872,7 +892,7 @@ def make_fortran_patterns():
 class FortranSH(BaseSH):
     """Fortran Syntax Highlighter"""
     # Syntax highlighting rules:
-    PROG = re.compile(make_fortran_patterns(), re.S|re.I)
+    PROG = _SmartosRegexParesseuse(make_fortran_patterns(), re.S|re.I)
     IDPROG = re.compile(r"\s+(\w+)", re.S)
     # Syntax highlighting states (from one text block to another):
     NORMAL = 0
@@ -942,7 +962,7 @@ def make_idl_patterns():
 
 class IdlSH(GenericSH):
     """IDL Syntax Highlighter"""
-    PROG = re.compile(make_idl_patterns(), re.S|re.I)
+    PROG = _SmartosRegexParesseuse(make_idl_patterns(), re.S|re.I)
 
 
 #==============================================================================
@@ -985,7 +1005,7 @@ def make_nsis_patterns():
 class NsisSH(CppSH):
     """NSIS Syntax Highlighter"""
     # Syntax highlighting rules:
-    PROG = re.compile(make_nsis_patterns(), re.S)
+    PROG = _SmartosRegexParesseuse(make_nsis_patterns(), re.S)
 
 
 #==============================================================================
@@ -1011,7 +1031,7 @@ def make_gettext_patterns():
 class GetTextSH(GenericSH):
     """gettext Syntax Highlighter"""
     # Syntax highlighting rules:
-    PROG = re.compile(make_gettext_patterns(), re.S)
+    PROG = _SmartosRegexParesseuse(make_gettext_patterns(), re.S)
 
 #==============================================================================
 # yaml highlighter
@@ -1034,7 +1054,7 @@ def make_yaml_patterns():
 class YamlSH(GenericSH):
     """yaml Syntax Highlighter"""
     # Syntax highlighting rules:
-    PROG = re.compile(make_yaml_patterns(), re.S)
+    PROG = _SmartosRegexParesseuse(make_yaml_patterns(), re.S)
 
 
 #==============================================================================
@@ -1111,7 +1131,7 @@ def make_html_patterns():
 
 class HtmlSH(BaseWebSH):
     """HTML Syntax Highlighter"""
-    PROG = re.compile(make_html_patterns(), re.S)
+    PROG = _SmartosRegexParesseuse(make_html_patterns(), re.S)
 
 
 # =============================================================================
@@ -1167,7 +1187,7 @@ def make_md_patterns():
 class MarkdownSH(BaseSH):
     """Markdown Syntax Highlighter"""
     # Syntax highlighting rules:
-    PROG = re.compile(make_md_patterns(), re.S)
+    PROG = _SmartosRegexParesseuse(make_md_patterns(), re.S)
     NORMAL = 0
     CODE = 1
 

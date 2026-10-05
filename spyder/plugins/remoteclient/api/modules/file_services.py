@@ -12,7 +12,7 @@ import typing
 from http import HTTPStatus
 from io import RawIOBase
 
-import aiohttp
+# Ajout SmartOS (_smartos_lazy_demarrage:aiohttp) : import differe dans les 3 fonction(s) qui s'en servent.
 
 from spyder.config.base import running_in_ci
 from spyder.plugins.remoteclient import SPYDER_PLUGIN_NAME
@@ -112,6 +112,7 @@ class SpyderRemoteFileIOAPI(SpyderBaseJupyterAPI, RawIOBase):
         *args,
         **kwargs,
     ):
+        import aiohttp  # _smartos_lazy_demarrage:aiohttp
         super().__init__(*args, **kwargs)
         self.name = file
         self.mode = mode
@@ -155,6 +156,7 @@ class SpyderRemoteFileIOAPI(SpyderBaseJupyterAPI, RawIOBase):
             raise e
 
     async def _check_connection(self):
+        import aiohttp  # _smartos_lazy_demarrage:aiohttp
         status = await self._websocket.receive()
 
         if status.type == aiohttp.WSMsgType.CLOSE:
@@ -383,6 +385,7 @@ class SpyderRemoteFileServicesAPI(SpyderBaseJupyterAPI):
 
     async def ls(self, path: Path, *, detail: bool = True):
         # The try/except is neccessary to prevent an error on CIs
+        import aiohttp  # _smartos_lazy_demarrage:aiohttp
         try:
             async with self.session.get(
                 self.api_url / "ls",

@@ -371,9 +371,10 @@ class FindInFilesWidget(PluginMainWidget):
 
         # Toolbar
         toolbar = self.get_main_toolbar()
-        for item in [self.search_text_edit, self.find_action,
-                     self.search_regexp_action, self.case_action,
-                     self.more_options_action]:
+        # SmartOS (patch_spyder_findinfiles_toolbar.py) : la barre ne garde que le champ de
+        # saisie et le bouton Rechercher. Les trois bascules (Expression reguliere, Sensible a la
+        # casse, Afficher les options avancees) partent dans le menu burger, cf. plus bas.
+        for item in [self.search_text_edit, self.find_action]:
             self.add_item_to_toolbar(
                 item,
                 toolbar=toolbar,
@@ -408,6 +409,18 @@ class FindInFilesWidget(PluginMainWidget):
             )
 
         menu = self.get_options_menu()
+
+        # SmartOS (patch_spyder_findinfiles_toolbar.py) : les trois bascules retirees de la barre.
+        # Section propre, declaree AVANT celle de "Definir le nombre maximum de resultats" : les
+        # sections sont rendues dans leur ordre de premiere utilisation, et separees par un trait.
+        for item in [self.search_regexp_action, self.case_action,
+                     self.more_options_action]:
+            self.add_item_to_menu(
+                item,
+                menu=menu,
+                section="smartos_search_options",
+            )
+
         self.add_item_to_menu(
             self.set_max_results_action,
             menu=menu,

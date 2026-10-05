@@ -38,6 +38,7 @@ from qtpy.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from qtpy.QtGui import QMoveEvent as _SmartosQMoveEvent, QResizeEvent as _SmartosQResizeEvent  # PATCH SmartOS [SmartOS pyside611-signaux-evenements]
 
 # Local imports
 from spyder.api.widgets.dialogs import SpyderDialogButtonBox
@@ -1235,8 +1236,8 @@ class OpenTourDialog(QDialog, SvgToScaledPixmap):
 
 class TourTestWindow(QMainWindow):
     """ """
-    sig_resized = Signal("QResizeEvent")
-    sig_moved = Signal("QMoveEvent")
+    sig_resized = Signal(_SmartosQResizeEvent)
+    sig_moved = Signal(_SmartosQMoveEvent)
 
     def __init__(self):
         super().__init__()

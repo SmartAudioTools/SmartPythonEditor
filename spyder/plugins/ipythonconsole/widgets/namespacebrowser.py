@@ -16,7 +16,7 @@ from pickle import PicklingError, UnpicklingError
 import sys
 
 # Third-party imports
-import cloudpickle
+# Ajout SmartOS (_smartos_lazy_demarrage:cloudpickle) : import differe dans les 2 fonction(s) qui s'en servent.
 from packaging.version import parse
 from qtconsole.rich_jupyter_widget import RichJupyterWidget
 from spyder_kernels.comms.commbase import CommError
@@ -48,6 +48,7 @@ class NamepaceBrowserWidget(RichJupyterWidget):
     def get_value(self, name):
         """Ask kernel for a value"""
         # ---- Reasons
+        import cloudpickle  # _smartos_lazy_demarrage:cloudpickle
         reason_big = _("The variable is too big to be retrieved")
         reason_not_picklable = _(
             "It was not possible to create a copy of the variable in the "
@@ -279,6 +280,7 @@ class NamepaceBrowserWidget(RichJupyterWidget):
 
     def set_value(self, name, value):
         """Set value for a variable"""
+        import cloudpickle  # _smartos_lazy_demarrage:cloudpickle
         reason_mismatched_numpy = _(
             "There is a mismatch between the Numpy versions used by Spyder "
             "and the kernel of your current console. To fix this problem, "

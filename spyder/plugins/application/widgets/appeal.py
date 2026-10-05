@@ -11,7 +11,7 @@ import os.path as osp
 from string import Template
 
 # Third-party imports
-from markdown_it import MarkdownIt
+# Ajout SmartOS (_smartos_lazy_demarrage:markdown_it) : import differe dans les 1 fonction(s) qui s'en servent.
 from qtpy.QtCore import Qt, QUrl
 from qtpy.QtWidgets import QDialog, QVBoxLayout
 
@@ -36,6 +36,7 @@ class InAppAppealDialog(QDialog, SpyderFontsMixin):
     HEIGHT = 620 if WIN else 640  # TODO: Check on Win/Mac
 
     def __init__(self, parent=None):
+        from markdown_it import MarkdownIt  # _smartos_lazy_demarrage:markdown_it
         super().__init__(parent)
 
         # Leave this import here to make Spyder work without WebEngine.

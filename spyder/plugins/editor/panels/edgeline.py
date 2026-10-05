@@ -10,7 +10,7 @@ This module contains the edge line panel
 
 # Third party imports
 from qtpy.QtCore import Qt
-from qtpy.QtGui import QPainter, QColor
+from qtpy.QtGui import QPainter, QColor, QPen
 
 # Local imports
 from spyder.plugins.editor.api.panel import Panel
@@ -31,9 +31,23 @@ class EdgeLine(Panel):
         painter = QPainter(self)
         size = self.size()
 
-        color = QColor(self.color)
-        color.setAlphaF(.5)
-        painter.setPen(color)
+        # Ligne de bord POINTILLEE, discrete et pixel-perfect (ajout SmartOS, cf.
+        # Commun/scripts/patch_spyder_edgeline_dotted.py) : la distingue de la ligne PLEINE
+        # de demarcation du greffon line-profiler entre le code et les temps.
+        # Couleur = fond de l'editeur a peine eclairci (10 %), meme teinte discrete que le
+        # trait de demarcation, pour la coherence.
+        # ⚠ setCosmetic(True) : la largeur d'un stylo cosmetique est en pixels PHYSIQUES,
+        # donc le trait fait toujours pile 1 px net quel que soit le facteur d'echelle KDE
+        # (fractionnaire compris). Motif [6, 2].
+        _base = self.editor.palette().base().color()
+        color = QColor(round(_base.red() * 0.9 + 25.5),
+                       round(_base.green() * 0.9 + 25.5),
+                       round(_base.blue() * 0.9 + 25.5))
+        pen = QPen(color)
+        pen.setWidth(1)
+        pen.setCosmetic(True)
+        pen.setDashPattern([6, 2])
+        painter.setPen(pen)
 
         for column in self.columns:
             # draw edge line at column n + 3 to account for line number margin

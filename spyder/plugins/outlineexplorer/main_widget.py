@@ -87,12 +87,14 @@ class OutlineExplorerWidget(PluginMainWidget):
             tip=_('Go to cursor position'),
             triggered=self.treewidget.go_to_cursor_position)
 
-        for item in [fromcursor_btn,
-                     self.treewidget.collapse_all_action,
-                     self.treewidget.expand_all_action,
-                     self.treewidget.restore_action,
-                     self.treewidget.collapse_selection_action,
-                     self.treewidget.expand_selection_action]:
+        # SmartOS (patch_spyder_outline_toolbar.py) : la barre ne garde que "Tout replier" et
+        # "Tout deplier". Les six boutons d'origine ne tenaient pas dans la colonne etroite de
+        # gauche : les deux derniers finissaient dans le bouton d'extension "..." de Qt.
+        # "Aller a la position du curseur" (fromcursor_btn) est retire sans rien perdre : la MEME
+        # commande a deja son entree dans le menu burger (fromcursor_act, plus bas). Les trois
+        # autres y sont deplacees (cf. la boucle ajoutee en fin de setup()).
+        for item in [self.treewidget.collapse_all_action,
+                     self.treewidget.expand_all_action]:
             self.add_item_to_toolbar(item, toolbar=toolbar,
                                      section=OutlineExplorerSections.Main)
 
@@ -148,9 +150,11 @@ class OutlineExplorerWidget(PluginMainWidget):
             option='sort_files_alphabetically'
         )
 
+        # SmartOS (2e passe, 26/07/2026) : fromcursor_act n'est plus une option d'affichage,
+        # elle rejoint les commandes d'arborescence plus bas - cf. l'explication en tete de fichier.
         actions = [fullpath_act, allfiles_act, group_cells_act,
                    display_variables_act, follow_cursor_act, comment_act,
-                   sort_files_alphabetically_act, fromcursor_act]
+                   sort_files_alphabetically_act]
 
         option_menu = self.get_options_menu()
         for action in actions:
@@ -158,6 +162,22 @@ class OutlineExplorerWidget(PluginMainWidget):
                 action,
                 option_menu,
                 section=OutlineExplorerSections.DisplayOptions,
+            )
+
+        # SmartOS (patch_spyder_outline_toolbar.py) : les quatre commandes d'arborescence, dans leur
+        # propre section (donc precedee d'un separateur), rendue apres les options d'affichage
+        # ci-dessus et avant les actions de dock - PluginMainWidgetOptionsMenu.render() reserve
+        # toujours la fin a celles-la. "Aller a la position du curseur" est ici et NON dans les
+        # options d'affichage ci-dessus : elle a une icone, elles n'en ont pas, et Qt place icone et
+        # case a cocher dans la meme colonne - son icone flottait donc sous sept cases vides.
+        for action in [fromcursor_act,
+                       self.treewidget.restore_action,
+                       self.treewidget.collapse_selection_action,
+                       self.treewidget.expand_selection_action]:
+            self.add_item_to_menu(
+                action,
+                option_menu,
+                section=OutlineExplorerSections.Main,
             )
 
     def update_actions(self):

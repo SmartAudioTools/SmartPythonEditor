@@ -86,14 +86,32 @@ class LayoutContainer(PluginMainContainer):
         )
 
         # Maximize current dockable plugin
+        # SmartOS (patch_spyder_maximize_icons.py) : icones personnalisees a la place de 'maximize',
+        # et bascule de l'icone selon l'etat - Spyder gardait la meme fleche "agrandir" sur un volet
+        # deja agrandi. Les deux SVG sont deposes dans spyder/images/dark/ par
+        # installation_SmartPythonEditor.sh (cf. Commun/icones/spyder/README.txt) : le gestionnaire d'images
+        # les indexe par leur nom de fichier, create_icon suffit donc.
         self._maximize_dockwidget_action = self.create_action(
             LayoutContainerActions.MaximizeCurrentDockwidget,
             text=_('Maximize current pane'),
-            icon=self.create_icon('maximize'),
+            icon=self.create_icon('window_full_screen'),
             toggled=lambda state: self._plugin.maximize_dockwidget(),
             context=Qt.ApplicationShortcut,
             register_shortcut=True,
             shortcut_context='_')
+
+        # SmartOS : connexion SUPPLEMENTAIRE, plutot qu'une modification du toggled ci-dessus - on ne
+        # veut pas dependre de la forme exacte de cette lambda a chaque montee de version. L'icone
+        # posee dit ce que FERA le bouton : fleches vers l'interieur quand le volet est agrandi (le
+        # clic suivant le remettra en place), vers l'exterieur sinon.
+        # L'etat vient de l'ARGUMENT du signal et non de action.isChecked() : setChecked() est appele
+        # depuis plusieurs endroits du greffon Layout, et deux sources de verite finiraient par
+        # diverger. ⚠ Une lambda et non une methode : ce bloc est au MILIEU de setup(), y dedenter un
+        # "def" couperait la methode en deux et le reste de setup() ne s'executerait plus.
+        self._maximize_dockwidget_action.toggled.connect(
+            lambda agrandi: self._maximize_dockwidget_action.setIcon(
+                self.create_icon(
+                    'window_collapse' if agrandi else 'window_full_screen')))
 
         # Fullscreen mode
         self._fullscreen_action = self.create_action(

@@ -394,6 +394,15 @@ class SpyderMenu(QMenu, SpyderFontsMixin):
                     actions.append(action)
 
             actions.append(MENU_SEPARATOR)
+
+        # SmartOS (patch_spyder_dock_actions.py) : retirer les separateurs de FIN de TOUT menu. La
+        # boucle ci-dessus en ajoute un apres CHAQUE section, derniere comprise, et add_actions()
+        # sait ignorer un separateur de TETE et les separateurs consecutifs, mais pas celui de fin.
+        # Meme correctif que dans PluginMainWidgetOptionsMenu.render() plus bas, qui n'appelle pas
+        # cette methode : il reordonne ses sections et reconstruit sa propre liste.
+        while actions and actions[-1] is MENU_SEPARATOR:
+            actions.pop()
+
         return actions
 
     def get_sections(self) -> tuple[str, ...]:
@@ -686,7 +695,53 @@ class PluginMainWidgetOptionsMenu(SpyderMenu):
                 if sec == bottom:
                     actions.append(action)
 
+            # SmartOS (patch_spyder_dock_actions.py) : retirer les separateurs de FIN. La boucle
+            # ci-dessus ajoute un separateur apres CHAQUE section, derniere comprise ; tant que la
+            # section Bottom portait Deplacer/Detacher/Ancrer/Fermer, quelque chose suivait toujours
+            # ce dernier trait. Ces actions retirees, le menu se terminait par un trait horizontal
+            # suivi de rien. add_actions() sait deja ignorer un separateur de TETE et les
+            # separateurs consecutifs, mais pas celui de fin.
+            while actions and actions[-1] is MENU_SEPARATOR:
+                actions.pop()
+
             add_actions(self, actions)
             self._set_icons()
 
             self._dirty = False
+
+
+# ---- SmartOS : mise en cache de la feuille de style des menus ----------------------------------
+# _generate_stylesheet() ne lit aucun etat d'instance : seulement la police d'interface, la palette,
+# les marges et les constantes de plateforme. Spyder la recalculait pourtant pour chacun des 129
+# menus crees au demarrage (420 ms mesures, ~10 % du lancement, l'essentiel passe dans qstylizer).
+# La cle du cache reprend exactement ces entrees : changer de theme ou de police donne une cle
+# differente, donc une feuille recalculee, sans invalidation a gerer.
+# ⚠ L'objet StyleSheet renvoye est PARTAGE entre tous les menus : valable tant qu'aucun menu ne le
+# modifie apres coup (verifie par Installation/tools/patch_spyder_menu_stylesheet_cache.py, qui refuse
+# de s'appliquer si self.css apparait ailleurs que dans sa creation et sa serialisation).
+_SMARTOS_MENU_CSS_CACHE = {}
+_smartos_generate_stylesheet = SpyderMenu._generate_stylesheet.__func__
+
+
+def _smartos_generate_stylesheet_cached(cls) -> qstylizer.style.StyleSheet:
+    """Version memorisee de SpyderMenu._generate_stylesheet (cf. commentaire ci-dessus)."""
+    font = cls.get_font(SpyderFontType.Interface)
+    cle = (
+        cls,
+        font.family(),
+        font.pointSize(),
+        SpyderPalette.COLOR_BACKGROUND_3,
+        SpyderPalette.COLOR_BACKGROUND_6,
+        AppStyle.MarginSize,
+        cls.HORIZONTAL_MARGIN_FOR_ITEMS,
+        cls.HORIZONTAL_PADDING_FOR_ITEMS,
+        MAC,
+        WIN,
+    )
+    css = _SMARTOS_MENU_CSS_CACHE.get(cle)
+    if css is None:
+        css = _SMARTOS_MENU_CSS_CACHE[cle] = _smartos_generate_stylesheet(cls)
+    return css
+
+
+SpyderMenu._generate_stylesheet = classmethod(_smartos_generate_stylesheet_cached)

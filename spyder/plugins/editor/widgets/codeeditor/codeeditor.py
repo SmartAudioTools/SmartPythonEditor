@@ -28,8 +28,8 @@ import textwrap
 
 # Third party imports
 from IPython.core.inputtransformer2 import TransformerManager
-import nbformat as nbformat
-from nbconvert import PythonExporter as nbexporter
+# Ajout SmartOS (_smartos_lazy_demarrage:nbformat) : import differe dans les 2 fonction(s) qui s'en servent.
+# Ajout SmartOS (_smartos_lazy_demarrage:nbconvert) : import differe dans les 1 fonction(s) qui s'en servent.
 from packaging.version import parse
 from qtpy import QT_VERSION
 from qtpy.QtCore import (
@@ -2895,6 +2895,7 @@ class CodeEditor(LSPMixin, TextEditBaseWidget, MultiCursorMixin):
 
     def clear_all_output(self):
         """Removes all output in the ipynb format (Json only)"""
+        import nbformat as nbformat  # _smartos_lazy_demarrage:nbformat
         try:
             nb = nbformat.reads(self.toPlainText(), as_version=4)
             if nb.cells:
@@ -2918,6 +2919,8 @@ class CodeEditor(LSPMixin, TextEditBaseWidget, MultiCursorMixin):
 
     def convert_notebook(self):
         """Convert an IPython notebook to a Python script in editor"""
+        import nbformat as nbformat  # _smartos_lazy_demarrage:nbformat
+        from nbconvert import PythonExporter as nbexporter  # _smartos_lazy_demarrage:nbconvert
         try:
             nb = nbformat.reads(self.toPlainText(), as_version=4)
             script = nbexporter().from_notebook_node(nb)[0]

@@ -13,8 +13,8 @@ import bisect
 import json
 
 # Third party imports
-from jsonschema.exceptions import ValidationError
-from jsonschema import validate as json_validate
+# Ajout SmartOS (_smartos_lazy_demarrage:jsonschema.exceptions) : import differe dans les 1 fonction(s) qui s'en servent.
+# Ajout SmartOS (_smartos_lazy_demarrage:jsonschema) : import differe dans les 1 fonction(s) qui s'en servent.
 from qtpy.compat import to_qvariant
 from qtpy.QtCore import Qt, Slot, QAbstractTableModel, QModelIndex, QSize
 from qtpy.QtWidgets import (QAbstractItemView, QCheckBox, QDialog,
@@ -602,6 +602,8 @@ class SnippetModelsProxy:
             json.dump(snippets, f)
 
     def import_snippets(self, filename):
+        from jsonschema import validate as json_validate  # _smartos_lazy_demarrage:jsonschema
+        from jsonschema.exceptions import ValidationError  # _smartos_lazy_demarrage:jsonschema.exceptions
         errors = {}
         total_snippets = 0
         valid_snippets = 0

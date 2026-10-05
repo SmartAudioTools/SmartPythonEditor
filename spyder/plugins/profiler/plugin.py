@@ -13,6 +13,7 @@ from typing import List
 
 # Third party imports
 from packaging.version import parse
+from qtpy.QtCore import Qt  # SmartOS : F10 applicatif (cf. patch reroute)
 
 # Local imports
 from spyder.api.plugins import Plugins, SpyderDockablePlugin
@@ -51,7 +52,7 @@ class Profiler(SpyderDockablePlugin, ShellConnectPluginMixin, RunExecutor):
         Plugins.Run,
         Plugins.Toolbar,
     ]
-    OPTIONAL = [Plugins.Editor]
+    OPTIONAL = [Plugins.Editor, 'spyder_line_profiler']  # SmartOS : profilage combine
     TABIFY = [Plugins.VariableExplorer, Plugins.Help]
     WIDGET_CLASS = ProfilerWidget
     CONF_SECTION = NAME
@@ -164,6 +165,10 @@ class Profiler(SpyderDockablePlugin, ShellConnectPluginMixin, RunExecutor):
             icon=self.create_icon('profiler'),
             shortcut_context=self.NAME,
             register_shortcut=True,
+            # SmartOS : F10 doit partir depuis l'editeur, pas seulement quand le panneau
+            # Profileur a le focus (defaut Qt.WidgetShortcut). Comme Shift+F10 du Line
+            # Profiler, on rend le raccourci applicatif.
+            shortcut_widget_context=Qt.ApplicationShortcut,
             add_to_menu={
                 "menu": ApplicationMenus.Run,
                 "section": RunMenuSections.Profile,
@@ -255,10 +260,20 @@ class Profiler(SpyderDockablePlugin, ShellConnectPluginMixin, RunExecutor):
     def on_mainwindow_visible(self):
         # Make plugin visible in case it's not but only once. For most users
         # this will display it in the UI when moving from 6.0 to 6.1
-        if not self.get_conf("make_visible", default=False):
+        if False:  # [SmartOS no-forced-switch] make_visible amont neutralise : il reaffichait le dock apres notre masquage par defaut
             if not self.get_widget().is_visible:
                 self.get_widget().toggle_view(True)
             self.set_conf("make_visible", True)
+
+        # SmartOS (patch_spyder_profiler_no_forced_switch.py) : meme garde que ci-dessus,
+        # pour DESACTIVER switch_to_plugin UNE fois - son defaut amont (True) ramene ce dock
+        # au premier plan a la fin de CHAQUE profilage, meme decoche d'Affichage > Panneaux,
+        # contraire a la promesse de patch_spyder_hide_docks.py ("on respecte le choix de
+        # l'utilisateur"). Ecrit le reglage UNE seule fois ; s'il le recoche ensuite depuis
+        # Preferences > Profileur, ce choix est respecte aux lancements suivants.
+        if not self.get_conf("smartos_switch_to_plugin_disabled_once", default=False):
+            self.set_conf("switch_to_plugin", False)
+            self.set_conf("smartos_switch_to_plugin_disabled_once", True)
 
     # ---- For execution
     # -------------------------------------------------------------------------
@@ -269,6 +284,50 @@ class Profiler(SpyderDockablePlugin, ShellConnectPluginMixin, RunExecutor):
         conf: ExtendedRunExecutionParameters
     ) -> List[RunResult]:
 
+        # Ajout SmartOS (_smartos_lp) : aiguillage du profilage "fichier" (F10 / bouton
+        # "Profiler le fichier"). Si le fichier lance a QUELQUE CHOSE a line-profiler (des marqueurs
+        # n'importe ou, OU l'option "profiler tout le code utilisateur"), on lance le profilage
+        # COMBINE (cProfile + lignes en une execution) qui remplit les deux panneaux ; sinon on
+        # laisse le cProfile in-noyau d'origine (le corps ci-dessous) s'executer. Cf.
+        # Commun/scripts/patch_spyder_profiler_reroute.py
+        #
+        # DECISION et LANCEMENT sont SEPARES a dessein (durcissement du 23/07/2026) :
+        #   - la DECISION est sous try/except : si elle echoue, on se replie sur le cProfile
+        #     integre, mais JAMAIS en silence. L'ancien `traceback.print_exc()` partait sur un
+        #     stderr que personne ne lit (le processus graphique de Spyder l'envoie la ou il a ete
+        #     lance, donc nulle part depuis le menu) ; il a fallu une soiree pour diagnostiquer un
+        #     "le line profiler ne se lance plus" alors que toute la chaine etait intacte ;
+        #   - le LANCEMENT est HORS du try : analyze() peut avoir DEJA demarre le sous-processus
+        #     kernprof, donc enchainer sur le cProfile in-noyau REJOUERAIT le script - effets de
+        #     bord en double (fichiers ecrits, requetes reseau). Une exception remonte alors a
+        #     Spyder, qui l'affiche : bruyant, mais sans seconde execution.
+        _smartos_cibles = None
+        try:
+            _smartos_lp = self.get_plugin('spyder_line_profiler', error=False)
+            if _smartos_lp is not None:
+                import os.path as _smartos_osp
+                from spyder_line_profiler.spyder.profile_targets import (
+                    config_lanceur as _smartos_config_lanceur)
+                # config_lanceur honore les DEUX modes : des marqueurs (targets non vides,
+                # n'importe ou) OU l'option "tout le code utilisateur" (all_user) => combine.
+                _smartos_file = _smartos_osp.normpath(
+                    _smartos_osp.abspath(input['run_input']['path']))
+                _smartos_config = _smartos_config_lanceur(_smartos_file)
+                _smartos_cibles = (bool(_smartos_config['targets'])
+                                   or _smartos_config['all_user'])
+        except Exception:
+            import logging as _smartos_logging
+            _smartos_logging.getLogger(__name__).exception(
+                "SmartOS : la decision de reroutage vers le line profiler a echoue ; repli sur "
+                "le cProfile integre. Des fonctions marquees seront ignorees.")
+            _smartos_cibles = None
+        if _smartos_cibles:
+            _smartos_p = conf['params']
+            _smartos_lp.get_widget().analyze(
+                _smartos_file,
+                wdir=_smartos_p['working_dir']['path'],
+                args=_smartos_p['executor_params'].get('args'))
+            return []
         console = self.get_plugin(Plugins.IPythonConsole)
         if console is None:
             return

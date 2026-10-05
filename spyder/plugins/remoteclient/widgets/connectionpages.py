@@ -17,7 +17,7 @@ from typing import TypedDict
 import uuid
 
 # Third party imports
-import asyncssh
+# Ajout SmartOS (_smartos_lazy_demarrage:asyncssh) : import differe dans les 2 fonction(s) qui s'en servent.
 from qtpy.QtCore import Qt
 from qtpy.QtWidgets import (
     QButtonGroup,
@@ -145,6 +145,7 @@ class BaseConnectionPage(SpyderConfigPage, SpyderFontsMixin):
     def validate_page(self):
         """Validate contents before saving the connection."""
         # Get widgets we're going to interact with
+        import asyncssh  # _smartos_lazy_demarrage:asyncssh
         auth_method = self.auth_method(from_gui=True)
         widgets = self._widgets_for_validation[auth_method]
         validate_label = self._validation_labels[auth_method]
@@ -799,6 +800,7 @@ class BaseConnectionPage(SpyderConfigPage, SpyderFontsMixin):
         return True if address_re.match(address) else False
 
     def _validate_config_file(self, config_filepath, from_gui=True):
+        import asyncssh  # _smartos_lazy_demarrage:asyncssh
         auth_method = self.auth_method(from_gui=from_gui)
 
         host_widget = self._address_widgets[auth_method]

@@ -11,6 +11,7 @@ import functools
 import logging
 import sys
 import textwrap
+import os.path as osp
 
 # Third-party imports
 from IPython.core import release as ipython_release
@@ -25,6 +26,7 @@ from spyder.api.translations import _
 from spyder.api.widgets.menus import SpyderMenu
 from spyder.config.base import running_in_ci
 from spyder.utils.stylesheet import MAC, WIN
+from spyder.utils.icon_manager import ima
 
 
 logger = logging.getLogger(__name__)
@@ -160,7 +162,13 @@ class MatplotlibStatus(ShellConnectStatusBarWidget):
             self.hide()
         else:
             self.set_shellwidget(shellwidget)
-            self.show()
+            # Backend Matplotlib (SmartOS, patch_spyder_statusbar_enable.py) : affiche seulement
+            # si statusbar/matplotlib_status/enable est vrai (masque par defaut).
+            from spyder.config.manager import CONF as _smartos_CONF
+            if _smartos_CONF.get("statusbar", "matplotlib_status/enable", True):
+                self.show()
+            else:
+                self.hide()
 
         # Ask the kernel to update the current backend, in case it has changed
         shellwidget.set_kernel_configuration("update_gui", True)
@@ -229,9 +237,9 @@ class PythonEnvironmentStatus(ShellConnectStatusBarWidget):
         # The format to display is:
         # env_type: env_name (Python python_version)
         text = (
-            env_type
-            + ": "
-            + env_info["name"]
+            # Prefixe "Custom:"/"Personnalise:" retire (SmartOS, cf.
+            # Commun/scripts/patch_spyder_interpreter_prefix.py) - demande utilisateur.
+            env_info["name"]
             + " (Python "
             + env_info["python_version"]
             + ")"
@@ -269,11 +277,65 @@ class PythonEnvironmentStatus(ShellConnectStatusBarWidget):
             self.hide()
         else:
             self.set_shellwidget(shellwidget)
-            self.show()
+            # Interpreteur de la console (SmartOS, patch_spyder_statusbar_enable.py) : affiche
+            # seulement si statusbar/pythonenv_status/enable est vrai (masque par defaut, le
+            # selecteur etant dans la barre d'outils "Interpreteur"). set_shellwidget ci-dessus
+            # reste appele -> update_status et sig_interpreter_changed fonctionnent.
+            from spyder.config.manager import CONF as _smartos_CONF
+            self.setVisible(bool(
+                _smartos_CONF.get("statusbar", "pythonenv_status/enable", True)))
 
     def show_menu(self):
         """Display a menu when clicking on the widget."""
         self.menu.clear_actions()
+
+        # Liste des interpreteurs directement selectionnables ici, sans passer par les Preferences
+        # (TODO du 18/07/2026, demande explicite de l'utilisateur). Reprend custom_interpreters_list,
+        # deja peuplee/maintenue a jour par nos propres scripts d'installation (cf.
+        # Commun/scripts/update_spyder_interpreters.py) plutot que par la detection pyenv de Spyder
+        # (buggy avec l'architecture SmartPythons, cf. CachyOS - DONE.txt).
+        current_path = (
+            self._current_env_info["path"] if self._current_env_info else None
+        )
+        interpreters = self.get_conf(
+            'custom_interpreters_list', default=[], section='main_interpreter'
+        )
+
+        def _interpreter_label(interpreter_path):
+            # Affiche juste le nom de l'environnement pyenv (ex. "SmartKonsole") plutot que le
+            # chemin complet ("/DATA/Python/SmartPython/CachyOS/versions/SmartKonsole/bin/python") -
+            # convention pyenv-virtualenv : le chemin est toujours de la forme
+            # ".../versions/<nom>/bin/python", donc le nom est le dossier 2 niveaux au-dessus de
+            # l'executable. Si la structure ne correspond pas a cette convention (interpreteur
+            # ajoute manuellement ailleurs), retourne le chemin complet tel quel plutot que de planter.
+            try:
+                label = osp.basename(osp.dirname(osp.dirname(interpreter_path)))
+            except Exception:
+                label = interpreter_path
+            return label or interpreter_path
+
+        # Tri alphabetique (insensible a la casse) sur le nom affiche, pas sur le chemin complet -
+        # demande explicite de l'utilisateur.
+        labeled_interpreters = sorted(
+            ((_interpreter_label(p), p) for p in interpreters),
+            key=lambda item: item[0].lower(),
+        )
+        for label, interpreter_path in labeled_interpreters:
+            # icone coche verte (deja utilisee par Spyder pour indiquer un etat "valide/ok", cf.
+            # icon_manager.py "dependency_ok") plutot qu'un prefixe texte - couleur issue de la
+            # palette Spyder (SpyderPalette.COLOR_SUCCESS_2), donc coherente avec le theme
+            # clair/sombre actif, contrairement a une couleur codee en dur.
+            select_action = self.create_action(
+                f"select_environment_{interpreter_path}",
+                text=label,
+                icon=ima.icon('dependency_ok') if interpreter_path == current_path else None,
+                triggered=functools.partial(
+                    self.select_interpreter, interpreter_path
+                ),
+                register_action=False,
+            )
+            self.add_item_to_menu(select_action, self.menu)
+
         text = _("Change default environment in Preferences...")
         change_action = self.create_action(
             "change_environment",
@@ -302,6 +364,16 @@ class PythonEnvironmentStatus(ShellConnectStatusBarWidget):
         )
 
         self.menu.popup(pos)
+
+    def select_interpreter(self, path):
+        """Set the given interpreter as Spyder's default, without opening any dialog."""
+        # Ne positionne pas 'executable' nous-memes : MainInterpreterContainer.on_interpreter_changed
+        # (deja cablee, cf. spyder/plugins/maininterpreter/container.py) le calcule et l'ecrit
+        # elle-meme a partir de ces 3 options - on reste sur le meme chemin que celui emprunte par
+        # les Preferences, sans dupliquer sa logique.
+        self.set_conf('custom_interpreter', path, section='main_interpreter')
+        self.set_conf('default', False, section='main_interpreter')
+        self.set_conf('custom', True, section='main_interpreter')
 
     def open_interpreter_preferences(self):
         """Request to open the main interpreter preferences."""

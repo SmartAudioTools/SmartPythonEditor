@@ -128,7 +128,11 @@ class VCSStatus(StatusBarWidget):
         text = branch if branch else ''
         if len(files_modified):
             text = text + ' [{}]'.format(len(files_modified))
-        self.setVisible(bool(branch))
+        # Activation du widget VCS honoree (SmartOS, patch_spyder_statusbar_enable.py) : ne
+        # l'afficher que s'il y a une branche ET que statusbar/vcs_status/enable est vrai.
+        from spyder.config.manager import CONF as _smartos_CONF
+        self.setVisible(bool(branch) and bool(
+            _smartos_CONF.get("statusbar", "vcs_status/enable", True)))
         self.set_value(text)
 
         self._git_is_working = False

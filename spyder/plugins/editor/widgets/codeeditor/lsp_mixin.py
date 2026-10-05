@@ -524,7 +524,24 @@ class LSPMixin:
         self.clear_extra_selections("code_analysis_highlight")
         self.clear_extra_selections("code_analysis_underline")
         for data in self.blockuserdata_list():
-            data.code_analysis = []
+            # PATCH SmartOS [SmartOS marques-pylint-ancrees] (26/07/2026) : on ne retire que
+            # les marques que le serveur de langage va republier, et on LAISSE celles de pylint,
+            # posees par le greffon spyder_code_analysis depuis les resultats du panneau
+            # « Analyse de code ».
+            #
+            # POURQUOI CELA SUFFIT A LES ANCRER : tout l'affichage (marge, barre de defilement,
+            # infobulle au survol, navigation d'un avertissement au suivant) lit `data.code_analysis`,
+            # c'est-a-dire la liste portee par le BLOC DE TEXTE - jamais un numero de ligne. Qt
+            # deplace le bloc avec sa ligne, comme il le fait pour les points d'arret. Le decalage
+            # venait uniquement de ce vidage suivi d'un remplissage a partir de numeros de ligne
+            # devenus faux ; ce qui n'est plus repositionne ne peut plus etre decale.
+            #
+            # ⚠ Depend d'un invariant : le serveur ne doit pas emettre de diagnostics de source
+            # « pylint » (le greffon pylint de pylsp reste eteint). Cf.
+            # Commun/scripts/patch_spyder_marques_pylint_ancrees.py.
+            data.code_analysis = [
+                marque for marque in data.code_analysis if marque[0] == "pylint"
+            ]
 
         self.setUpdatesEnabled(True)
         # When the new code analysis results are empty, it is necessary

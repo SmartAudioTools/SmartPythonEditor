@@ -25,7 +25,7 @@ try:
 except Exception:
     pass
 
-import github
+# Ajout SmartOS (_smartos_lazy_demarrage:github) : import differe dans les 2 fonction(s) qui s'en servent.
 from qtpy.QtCore import Qt
 from qtpy.QtWidgets import QApplication, QMessageBox
 
@@ -119,6 +119,7 @@ class GithubBackend(BaseBackend):
         self._show_msgbox = True  # False when running the test suite
 
     def send_report(self, title, body, application_log=None):
+        import github  # _smartos_lazy_demarrage:github
         logger.debug('sending bug report on github\ntitle=%s\nbody=%s',
                      title, body)
 
@@ -251,6 +252,7 @@ class GithubBackend(BaseBackend):
         return credentials
 
     def upload_log_file(self, gh, log_content):
+        import github  # _smartos_lazy_demarrage:github
         auth_user = gh.get_user()
         try:
             qApp = QApplication.instance()

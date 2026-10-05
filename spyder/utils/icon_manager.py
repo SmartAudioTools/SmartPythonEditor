@@ -124,7 +124,11 @@ class IconManager():
             'keyboard':                [('mdi.keyboard',), {'color': self.MAIN_FG_COLOR}],
             'eyedropper':              [('mdi.eyedropper',), {'color': self.MAIN_FG_COLOR}],
             'tooloptions':             [('mdi.menu',), {'color': self.MAIN_FG_COLOR}],
-            'filenew':                 [('mdi.file',), {'color': self.MAIN_FG_COLOR}],
+            # PATCH SmartOS [SmartOS icone-fichier filenew] (26/07/2026) : entree RETIREE du
+            # dictionnaire des glyphes, a dessein. icon() consultant _qtaargs AVANT le
+            # dossier d'images, c'est son ABSENCE ici qui fait servir le fichier
+            # spyder/images/{dark,light}/filenew.svg (depose par installation_SmartPythonEditor.sh
+            # depuis Commun/icones/spyder/). Cf. patch_spyder_icones_fichier.py.
             'fileopen':                [('mdi.folder-open',), {'color': self.MAIN_FG_COLOR}],
             'revert':                  [('mdi.undo',), {'color': self.MAIN_FG_COLOR}],
             'filesave':                [('mdi.content-save',), {'color': self.MAIN_FG_COLOR}],
@@ -132,9 +136,9 @@ class IconManager():
             'filesaveas':              [('mdi.content-save-edit',), {'color': self.MAIN_FG_COLOR}],
             'print':                   [('mdi.printer',), {'color': self.MAIN_FG_COLOR}],
             'fileclose':               [('mdi.close',), {'color': self.MAIN_FG_COLOR}],
-            'breakpoint_transparent':  [('mdi.checkbox-blank-circle',), {'color': SpyderPalette.COLOR_ERROR_1, 'opacity': 0.75, 'scale_factor': 0.9}],
-            'breakpoint_big':          [('mdi.checkbox-blank-circle',), {'color': SpyderPalette.ICON_4, 'scale_factor': 0.9} ],
-            'breakpoint_cond_big':     [('mdi.help-circle',), {'color': SpyderPalette.ICON_4, 'scale_factor': 0.9},],
+            'breakpoint_transparent':  [('mdi.checkbox-blank-circle',), {'color': SpyderPalette.ICON_2, 'opacity': 0.55, 'scale_factor': 0.9}],
+            'breakpoint_big':          [('mdi.checkbox-blank-circle',), {'color': SpyderPalette.ICON_2, 'scale_factor': 0.9} ],
+            'breakpoint_cond_big':     [('mdi.help-circle',), {'color': SpyderPalette.ICON_2, 'scale_factor': 0.9},],
             'breakpoints':             [('mdi.dots-vertical',), {'color': self.MAIN_FG_COLOR}],
             'arrow_debugger':          [('mdi.arrow-right-bold',), {'color': SpyderPalette.ICON_2, 'scale_factor': 1.5}],
             'arrow-step-over':         [('mdi.debug-step-over',), {'color': SpyderPalette.ICON_2}],
@@ -594,3 +598,32 @@ def base64_from_icon_obj(icon_obj, width, height):
 
 
 MAIN_FG_COLOR = ima.MAIN_FG_COLOR
+
+
+# ---- SmartOS (_smartos_icones_memo) : icones SVG rendues une seule fois ------------------------
+# get_icon() rendait la meme image a chaque appel (129 appels pour 44 icones au demarrage). Voir
+# spyder_patch/patch_spyder_styles_icones_demarrage.py du generator.
+def _smartos_icones_memo():
+    from spyder.utils.image_path_manager import IMAGE_PATH_MANAGER
+
+    construire = IconManager.get_icon
+    chemins = IMAGE_PATH_MANAGER.IMG_PATH
+    gardees = {}
+
+    def get_icon(self, name, resample=False):
+        try:
+            # Le chemin fait partie de la cle : un greffon peut enregistrer plus tard un dossier
+            # d'images qui fournit (ou remplace) cette icone.
+            cle = (name, resample, chemins.get(name))
+            icone = gardees[cle]
+        except KeyError:
+            icone = gardees[cle] = construire(self, name, resample)
+        except TypeError:  # nom non hachable : comme en amont
+            return construire(self, name, resample)
+        return QIcon(icone)
+
+    get_icon.__doc__ = construire.__doc__
+    IconManager.get_icon = get_icon
+
+
+_smartos_icones_memo()

@@ -16,12 +16,81 @@ import qdarkstyle
 from qstylizer.parser import parse as parse_stylesheet
 import qstylizer.style
 
+
+# ---- SmartOS (_smartos_qstylizer_memo) : fonctions pures de qstylizer memorisees ---------------
+# Chaque regle de style recalculait, dans son __init__, la liste de ses attributs possibles, qui
+# ne depend que de sa classe. Voir spyder_patch/patch_spyder_qstylizer_memo.py du generator.
+def _smartos_qstylizer_memo():
+    import functools
+    import importlib.metadata
+    from qstylizer.descriptor.stylerule import StyleRuleParent
+
+    # Le partage des resultats suppose que qstylizer ne les modifie pas : verifie pour 0.2.x.
+    if not importlib.metadata.version("qstylizer").startswith("0.2."):
+        return
+
+    def par_classe(nom):
+        originale = StyleRuleParent.__dict__[nom].__func__
+        cache = {}
+
+        @functools.wraps(originale)
+        def memorisee(cls):
+            try:
+                return cache[cls]
+            except KeyError:
+                resultat = cache[cls] = originale(cls)
+                return resultat
+
+        setattr(StyleRuleParent, nom, classmethod(memorisee))
+
+    def cle_assainie(classe):
+        originale = classe.__dict__["_sanitize_key"].__func__
+        en_cache = functools.lru_cache(maxsize=None)(originale)
+
+        @functools.wraps(originale)
+        def memorisee(key):
+            if type(key) is str:
+                return en_cache(key)
+            return originale(key)
+
+        classe._sanitize_key = staticmethod(memorisee)
+
+    par_classe("get_attributes")
+    par_classe("get_attr_options")
+    for classe in list(vars(qstylizer.style).values()):
+        if (isinstance(classe, type)
+                and isinstance(classe.__dict__.get("_sanitize_key"), staticmethod)):
+            cle_assainie(classe)
+
+
+try:
+    _smartos_qstylizer_memo()
+except Exception:
+    # Une optimisation ne doit jamais empecher Spyder de s'ouvrir.
+    import traceback
+    traceback.print_exc()
+
 # Local imports
 from spyder.api.config.mixins import SpyderConfigurationAccessor
 from spyder.api.fonts import SpyderFontType, SpyderFontsMixin
 from spyder.api.utils import classproperty
 from spyder.config.gui import is_dark_interface
 from spyder.utils.palette import SpyderPalette
+
+
+def smartos_editor_background():
+    """Couleur de fond de l'editeur de texte (fond du theme de coloration syntaxique actif).
+
+    Ajout SmartOS (cf. Commun/scripts/patch_spyder_colors.py) : sert a aligner la barre d'outils
+    principale et les separateurs de docks sur l'editeur. Import local pour ne pas creer d'import
+    circulaire avec spyder.config.manager au chargement de ce module.
+    """
+    try:
+        from spyder.config.gui import get_color_scheme
+        from spyder.config.manager import CONF
+        return get_color_scheme(CONF.get('appearance', 'selected'))['background']
+    except Exception:
+        return SpyderPalette.COLOR_BACKGROUND_1
 
 
 # =============================================================================
@@ -98,9 +167,11 @@ class SpyderStyleSheet:
         return self._stylesheet
 
     def to_string(self):
-        if self._stylesheet.toString() == "":
+        feuille = self._stylesheet.toString()  # SmartOS (_smartos_to_string_unique)
+        if feuille == "":
             self.set_stylesheet()
-        return self._stylesheet.toString()
+            feuille = self._stylesheet.toString()
+        return feuille
 
     def get_copy(self):
         """
@@ -343,6 +414,21 @@ class AppStylesheet(SpyderStyleSheet, SpyderConfigurationAccessor):
             padding=f"{AppStyle.MarginSize - 1}px 0px",
         )
 
+        # Barre de statut a la couleur de fond de l'editeur (ajout SmartOS, cf.
+        # Commun/scripts/patch_spyder_colors.py), comme la barre d'outils et les separateurs.
+        smartos_background = smartos_editor_background()
+        css.QStatusBar.setValues(
+            background=smartos_background,
+            backgroundColor=smartos_background,
+            border=f'1px solid {smartos_background}',
+        )
+
+        # Separateurs de docks a la couleur de fond de l'editeur (ajout SmartOS, cf.
+        # Commun/scripts/patch_spyder_colors.py). L'etat :hover reste volontairement distinct.
+        css['QMainWindow::separator'].setValues(
+            backgroundColor=smartos_editor_background()
+        )
+
 
 APP_STYLESHEET = AppStylesheet()
 
@@ -388,6 +474,12 @@ class ApplicationToolbarStylesheet(SpyderStyleSheet):
         # Remove indicator for popup mode
         css['QToolBar QToolButton::menu-indicator'].setValues(
             image='none'
+        )
+
+        # Barre d'outils principale a la couleur de fond de l'editeur (ajout SmartOS, cf.
+        # Commun/scripts/patch_spyder_colors.py) au lieu de COLOR_BACKGROUND_4.
+        css.QToolBar.setValues(
+            backgroundColor=smartos_editor_background()
         )
 
 
@@ -927,3 +1019,75 @@ class DialogStyle(SpyderFontsMixin):
             return f"{2 * AppStyle.MarginSize}px {4 * AppStyle.MarginSize}px"
         else:
             return f"{AppStyle.MarginSize + 1}px {AppStyle.MarginSize}px"
+
+
+# ---- SmartOS (_smartos_feuille_app_cache) : feuille de style de l'application gardee sur disque --
+# La construire demandait 78 ms a chaque lancement (analyse de la feuille de QDarkStyle en python
+# pur). Voir spyder_patch/patch_spyder_feuille_app_cache.py du generator.
+def _smartos_feuille_app_cache():
+    import hashlib
+    import json
+
+    construire = AppStylesheet.to_string
+    objet_amont = AppStylesheet.get_stylesheet
+
+    def cle_de(self, brute):
+        ingredients = [
+            brute,
+            sorted((nom, valeur) for nom in dir(SpyderPalette)
+                   if not nom.startswith("_")
+                   for valeur in [getattr(SpyderPalette, nom)] if isinstance(valeur, str)),
+            self.get_conf('app_font/family', section='appearance'),
+            self.get_conf('app_font/size', section='appearance'),
+            AppStyle._fs, AppStyle.ComboBoxMinHeight, sys.platform,
+        ]
+        # Fond du theme de coloration de l'editeur : le correctif SmartOS des couleurs le pose
+        # sur la barre d'etat et les separateurs (absent si ce correctif n'est pas applique).
+        fond_editeur = globals().get("smartos_editor_background")
+        if fond_editeur is not None:
+            ingredients.append(fond_editeur())
+        for fichier in (__file__, qstylizer.style.__file__):
+            etat = os.stat(fichier)
+            ingredients.append((etat.st_mtime_ns, etat.st_size))
+        return hashlib.sha1(repr(ingredients).encode("utf-8")).hexdigest()
+
+    def to_string(self):
+        if self._stylesheet_as_string is not None:
+            return self._stylesheet_as_string
+        chemin = cle = None
+        try:
+            from spyder.config.base import get_conf_path
+
+            chemin = get_conf_path("smartos_feuille_app.json")
+            # Toujours appele : enregistre les ressources Qt que la feuille reference.
+            cle = cle_de(self, qdarkstyle.load_stylesheet(palette=SpyderPalette))
+            with open(chemin, encoding="utf-8") as fichier:
+                garde = json.load(fichier)
+            if garde["cle"] == cle and garde["feuille"]:
+                self._smartos_objet_a_construire = True
+                self._stylesheet_as_string = garde["feuille"]
+                return self._stylesheet_as_string
+        except Exception:
+            pass
+        feuille = construire(self)
+        if cle is not None:
+            try:
+                provisoire = "%s.%d" % (chemin, os.getpid())
+                with open(provisoire, "w", encoding="utf-8") as fichier:
+                    json.dump({"cle": cle, "feuille": feuille}, fichier)
+                os.replace(provisoire, chemin)
+            except Exception:
+                pass
+        return feuille
+
+    def get_stylesheet(self):
+        if getattr(self, "_smartos_objet_a_construire", False):
+            self._smartos_objet_a_construire = False
+            self.set_stylesheet()
+        return objet_amont(self)
+
+    AppStylesheet.to_string = to_string
+    AppStylesheet.get_stylesheet = get_stylesheet
+
+
+_smartos_feuille_app_cache()

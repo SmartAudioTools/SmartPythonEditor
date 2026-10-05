@@ -39,6 +39,7 @@ from typing import TYPE_CHECKING
 from qtpy.QtCore import QObject, Qt, Signal, Slot
 from qtpy.QtGui import QCursor, QFont, QIcon
 from qtpy.QtWidgets import QApplication, QWidget
+from qtpy.QtGui import QMoveEvent as _SmartosQMoveEvent, QResizeEvent as _SmartosQResizeEvent  # PATCH SmartOS [SmartOS pyside611-signaux-evenements]
 
 # Local imports
 from spyder.api.config.mixins import BasicTypes, SpyderConfigurationObserver
@@ -414,7 +415,7 @@ class SpyderPluginV2(
         error dialog.
     """
 
-    sig_mainwindow_resized: Signal = Signal("QResizeEvent")
+    sig_mainwindow_resized: Signal = Signal(_SmartosQResizeEvent)
     """
     Emitted when the main window is resized.
 
@@ -426,7 +427,7 @@ class SpyderPluginV2(
         The event triggered on main window resize.
     """
 
-    sig_mainwindow_moved: Signal = Signal("QMoveEvent")
+    sig_mainwindow_moved: Signal = Signal(_SmartosQMoveEvent)
     """
     Emitted when the main window is moved.
 

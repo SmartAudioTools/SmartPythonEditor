@@ -9,6 +9,38 @@
 import os
 import sys
 
+# ---- SmartOS (_smartos_points_entree_memo) : points d'entree lus une fois pendant le demarrage --
+# Voir spyder_patch/patch_spyder_points_entree_memo.py du generator.
+def _smartos_points_entree_memo():
+    import importlib.metadata as metadata
+    # Pas de « import time » litteral : le sed setproctitle de appliquer_correctifs_spyder.sh
+    # vise ce texte dans ce fichier.
+    from time import monotonic
+
+    amont = metadata.entry_points
+    fin = monotonic() + 20
+    memo = []
+
+    def entry_points(**params):
+        if monotonic() > fin:
+            memo.clear()
+            return amont(**params)
+        if not memo:
+            memo.append(amont())
+        return memo[0].select(**params)
+
+    metadata.entry_points = entry_points
+
+
+if sys.version_info[:2] == (3, 12):
+    _smartos_points_entree_memo()
+
+# ---- SmartOS (_smartos_gc_demarrage_suspendu) : pas de ramasse-miettes pendant le demarrage ----
+# Retabli par mainwindow.py (_smartos_gc_demarrage_retabli). Voir
+# spyder_patch/patch_spyder_gc_demarrage.py du generator.
+import gc as _smartos_gc_demarrage_suspendu
+_smartos_gc_demarrage_suspendu.disable()
+
 # Remove PYTHONPATH paths from sys.path before other imports to protect against
 # shadowed standard libraries.
 if os.environ.get('PYTHONPATH'):
@@ -28,6 +60,9 @@ import os.path as osp
 import random
 import socket
 import time
+import setproctitle
+
+setproctitle.setproctitle('spyder')
 import warnings
 
 # Prevent showing internal logging errors
@@ -147,6 +182,17 @@ def main():
     options to the application.
     """
     # Parse command line options
+    # Ajout SmartOS (_smartos_startup_trace) : chronometre de demarrage, actif seulement
+    # si SMARTOS_STARTUP_TRACE=<chemin.json> est defini (voir smartos_startup_trace.py).
+    if os.environ.get('SMARTOS_STARTUP_TRACE'):
+        try:
+            import smartos_startup_trace as _smartos_startup_trace
+            _smartos_startup_trace.demarrer()
+        except Exception:
+            # Une option de mesure ne doit jamais empecher Spyder de s'ouvrir.
+            import traceback
+            traceback.print_exc()
+
     options, args = (CLI_OPTIONS, CLI_ARGS)
 
     # This is to allow reset without reading our conf file

@@ -20,6 +20,7 @@ from qtpy.QtGui import (
 
 # Local imports
 from spyder.utils.icon_manager import ima
+from spyder.utils.palette import SpyderPalette
 from spyder.plugins.editor.api.panel import Panel
 from spyder.plugins.completion.api import DiagnosticSeverity
 
@@ -45,6 +46,13 @@ class LineNumberArea(Panel):
         self.warning_icon = ima.icon('warning')
         self.info_icon = ima.icon('information')
         self.hint_icon = ima.icon('hint')
+        # PATCH SmartOS [SmartOS marge-icones-pylint-chargement] (26/07/2026) : les deux icones du
+        # panneau « Analyse de code » (PylintWidget.CATEGORIES), pour que la marge montre le meme
+        # dessin que lui - un « C » cercle pour une convention, un « R » pour une factorisation. Les
+        # deux autres familles, erreur et avertissement, utilisent DEJA la meme icone de part et
+        # d'autre : il n'y avait que ces deux-la a ajouter.
+        self.convention_icon = ima.icon('convention')
+        self.refactor_icon = ima.icon('refactor')
         self.todo_icon = ima.icon('todo')
 
         # Line number area management
@@ -110,11 +118,22 @@ class LineNumberArea(Panel):
                     warnings = 0
                     infos = 0
                     hints = 0
-                    for _, _, sev, _ in data.code_analysis:
+                    # PATCH SmartOS [SmartOS marge-icones-pylint-emploi] (26/07/2026) : la
+                    # marge choisit son icone d'apres la SEVERITE LSP, qui ne dit pas la famille
+                    # pylint. Or celle-ci se lit dans l'identifiant du message - C0114 est une
+                    # convention, R0903 une factorisation - ce qui permet de montrer le MEME dessin
+                    # que le panneau « Analyse de code ». Ne concerne que les marques de source
+                    # « pylint » : un diagnostic venu d'ailleurs garde les icones habituelles.
+                    convention_pylint = False
+                    refactor_pylint = False
+                    for _source, _code, sev, _ in data.code_analysis:
                         errors += sev == DiagnosticSeverity.ERROR
                         warnings += sev == DiagnosticSeverity.WARNING
                         infos += sev == DiagnosticSeverity.INFORMATION
                         hints += sev == DiagnosticSeverity.HINT
+                        if _source == 'pylint' and isinstance(_code, str):
+                            convention_pylint = convention_pylint or _code.startswith('C')
+                            refactor_pylint = refactor_pylint or _code.startswith('R')
 
                     if errors:
                         draw_pixmap(1, top, self.error_icon.pixmap(icon_size))
@@ -122,12 +141,44 @@ class LineNumberArea(Panel):
                         draw_pixmap(
                             1, top, self.warning_icon.pixmap(icon_size))
                     elif infos:
-                        draw_pixmap(1, top, self.info_icon.pixmap(icon_size))
+                        draw_pixmap(1, top, (
+                            self.convention_icon if convention_pylint else self.info_icon
+                        ).pixmap(icon_size))
                     elif hints:
-                        draw_pixmap(1, top, self.hint_icon.pixmap(icon_size))
+                        draw_pixmap(1, top, (
+                            self.refactor_icon if refactor_pylint else self.hint_icon
+                        ).pixmap(icon_size))
 
                 if self._markers_margin and data.todo:
                     draw_pixmap(1, top, self.todo_icon.pixmap(icon_size))
+
+        # Numero de ligne en ROUGE FONCE pour les lignes en erreur (SmartOS, cf.
+        # Commun/scripts/patch_spyder_error_margin.py). Complete l'icone de la marge, elle ne la
+        # remplace plus : la colonne de marqueurs a ete RETABLIE le 26/07/2026 a la demande de
+        # l'utilisateur, apres qu'elle avait ete supprimee le 22/07/2026 a sa demande egalement.
+        # ⚠ L'EFFACEMENT DE LA CELLULE COMMENCE APRES LA MARGE DE MARQUEURS, jamais a x=0 : la
+        # version precedente repeignait toute la largeur, ce qui recouvrirait desormais l'icone
+        # d'erreur que l'on vient de tracer - le numero rouge aurait alors mange le marqueur, sur
+        # les lignes precisement ou il compte le plus.
+        marge = self.get_markers_margin()
+        font = self.editor.font()
+        font.setWeight(QFont.Weight.Normal)
+        painter.setFont(font)
+        for top, line_number, block in self.editor.visible_blocks:
+            data = block.userData()
+            if data and data.code_analysis and any(
+                sev == DiagnosticSeverity.ERROR
+                for _, _, sev, _ in data.code_analysis
+            ):
+                painter.fillRect(
+                    marge, top, self.width() - marge, font_height,
+                    self.editor.sideareas_color
+                )
+                painter.setPen(QColor(SpyderPalette.COLOR_ERROR_1))
+                painter.drawText(
+                    marge, top, self.width() - marge, font_height,
+                    int(Qt.AlignRight | Qt.AlignTop), str(line_number)
+                )
 
     def draw_linenumbers(self, painter):
         """Draw line numbers."""
@@ -320,6 +371,10 @@ class LineNumberArea(Panel):
 
     def get_markers_margin(self):
         """Get marker margins."""
+        # Colonne de marqueurs RETABLIE (SmartOS, 26/07/2026) : elle avait ete supprimee le
+        # 22/07/2026 - get_markers_margin renvoyait 0 - au profit du seul numero en rouge. Retour a
+        # la demande de l'utilisateur : le numero rouge ne signalait que les ERREURS, et faisait donc
+        # disparaitre tout indicateur d'avertissement, d'information, d'indice et de todo.
         font_height = self.editor.fontMetrics().height() + 2
         return font_height
 
