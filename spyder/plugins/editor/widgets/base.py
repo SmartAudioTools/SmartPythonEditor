@@ -73,7 +73,7 @@ class TextEditBaseWidget(
         # Code snippets
         self.code_snippets = True
 
-        self.cursorPositionChanged.connect(self.cursor_position_changed)
+        self.cursorPositionChanged.connect(self.on_cursor_position_changed)
 
         self.indent_chars = " "*4
         self.tab_stop_width_spaces = 4
@@ -422,7 +422,7 @@ class TextEditBaseWidget(
             extra_selections.append(selection)
         self.set_extra_selections('brace_matching', extra_selections)
 
-    def cursor_position_changed(self):
+    def on_cursor_position_changed(self):
         """Handle brace matching."""
         # Clear last brace highlight (if any)
         if self.bracepos is not None:

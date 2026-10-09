@@ -548,7 +548,7 @@ class ProfilerDataTree(QTreeWidget, SpyderConfigurationAccessor):
         self.setColumnCount(len(self.header_list))
         self.setHeaderLabels(self.header_list)
         self.initialize_view()
-        self.itemExpanded.connect(self.item_expanded)
+        self.itemExpanded.connect(self.on_item_expanded)
         self.lib_pathlist = None
         self.history = []
         self.redo_history = []
@@ -865,7 +865,7 @@ class ProfilerDataTree(QTreeWidget, SpyderConfigurationAccessor):
             )
         return item_profdata, item_compdata
 
-    def item_expanded(self, item):
+    def on_item_expanded(self, item):
         """Fill item children."""
         if item.childCount() == 0 and id(item) in self.items_to_be_shown:
             children_list = self.items_to_be_shown[id(item)]

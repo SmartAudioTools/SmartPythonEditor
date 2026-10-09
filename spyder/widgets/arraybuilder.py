@@ -140,7 +140,7 @@ class ArrayTable(QTableWidget):
         self.reset_headers()
 
         # Signals
-        self.cellChanged.connect(self.cell_changed)
+        self.cellChanged.connect(self.on_cell_changed)
 
     def keyPressEvent(self, event):
         shift = event.modifiers() & Qt.ShiftModifier
@@ -153,7 +153,7 @@ class ArrayTable(QTableWidget):
 
         super().keyPressEvent(event)
 
-    def cell_changed(self, row, col):
+    def on_cell_changed(self, row, col):
         item = self.item(row, col)
         value = None
 
