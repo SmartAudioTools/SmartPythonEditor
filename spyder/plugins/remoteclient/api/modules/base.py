@@ -11,8 +11,8 @@ import logging
 import typing
 from abc import abstractmethod
 
-import aiohttp
-import yarl
+# Ajout SmartOS (_smartos_lazy_demarrage:aiohttp) : import differe dans les 4 fonction(s) qui s'en servent.
+# Ajout SmartOS (_smartos_lazy_demarrage:yarl) : import differe dans les 1 fonction(s) qui s'en servent.
 
 from spyder.api.asyncdispatcher import AsyncDispatcher
 from spyder.api.utils import ABCMeta, abstract_attribute
@@ -78,6 +78,7 @@ class SpyderBaseJupyterAPI(metaclass=ABCMeta):
         return self.manager.server_name
 
     def __init__(self, manager: SpyderRemoteAPIManagerBase):
+        import aiohttp  # _smartos_lazy_demarrage:aiohttp
         self.manager = manager
         self._session: typing.Optional[aiohttp.ClientSession] = None
 
@@ -104,6 +105,7 @@ class SpyderBaseJupyterAPI(metaclass=ABCMeta):
 
     @property
     def server_url(self) -> yarl.URL:
+        import yarl  # _smartos_lazy_demarrage:yarl
         return yarl.URL(self.manager.server_url)
 
     @property
@@ -125,6 +127,7 @@ class SpyderBaseJupyterAPI(metaclass=ABCMeta):
         SpyderRemoteConnectionError
             If the connection to the remote server could not be established.
         """
+        import aiohttp  # _smartos_lazy_demarrage:aiohttp
         if not await AsyncDispatcher(
             loop="asyncssh",
             return_awaitable=True,
@@ -273,6 +276,7 @@ class JupyterAPI(SpyderBaseJupyterAPI):
 
     @SpyderBaseJupyterAPI.retry()
     async def get_kernel(self, kernel_id):
+        import aiohttp  # _smartos_lazy_demarrage:aiohttp
         try:
             async with self.session.get(
                 self.api_url / "kernels" / kernel_id
@@ -324,6 +328,7 @@ class JupyterAPI(SpyderBaseJupyterAPI):
 
     async def get_plugin_version(self):
         """Get the version of the Jupyter server."""
+        import aiohttp  # _smartos_lazy_demarrage:aiohttp
         try:
             async with self.session.get(
                 self.server_url / SPYDER_PLUGIN_NAME / "version",

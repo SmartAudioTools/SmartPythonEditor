@@ -153,6 +153,16 @@ class ProfilerSubWidget(
 
     def show_profile_buffer(self, prof_buffer, lib_pathlist):
         """Show profile file."""
+        # SmartOS : alimenter la marge de droite de l'editeur (def-heatmap cProfile) meme sans
+        # fonction marquee. Le chemin cProfile-seul du bouton "Profiler le fichier" ne passe pas
+        # par le line profiler, donc n'appelait jamais publish(). Cf.
+        # profile_results.publish_cprofile et patch_spyder_profiler_reroute.py.
+        try:
+            from spyder_line_profiler.spyder.profile_results import (
+                publish_cprofile as _smartos_publish_cprofile)
+            _smartos_publish_cprofile(prof_buffer)
+        except Exception:
+            pass
         if not prof_buffer:
             return
 
@@ -834,8 +844,14 @@ class ProfilerDataTree(QTreeWidget, SpyderConfigurationAccessor):
             if not child_item.is_recursive():
                 grandchildren_list = self.find_children(child_key)
                 if grandchildren_list:
+                    # PATCH SmartOS [SmartOS enum-indicateur-scopee] (26/07/2026) : l'enumeration
+                    # est lue sur la CLASSE, et sous sa forme pleinement scopee. La lire sur
+                    # l'INSTANCE (child_item.ShowIndicator) leve AttributeError sous PySide6, qui
+                    # n'expose plus les membres d'enumeration sur les objets - l'arbre du profileur
+                    # restait alors vide. On evite aussi l'alias plat QTreeWidgetItem.ShowIndicator,
+                    # qui fonctionne encore mais que Qt supprime peu a peu.
                     child_item.setChildIndicatorPolicy(
-                        child_item.ShowIndicator
+                        QTreeWidgetItem.ChildIndicatorPolicy.ShowIndicator
                     )
                     self.items_to_be_shown[id(child_item)] = grandchildren_list
 

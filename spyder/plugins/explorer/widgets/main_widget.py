@@ -287,7 +287,11 @@ class ExplorerWidget(PluginMainWidget):
         # Common toolbuttons
         self.filter_button = self.create_action(
             ExplorerWidgetActions.ToggleFilter,
-            text="",
+            # Libelle du bouton de filtre dans le menu, TRADUIT via _() comme les autres items.
+            # "Filter files" -> "Filtrer les fichiers" (et non "les noms de fichiers" : on filtre
+            # aussi par extension). Cette traduction est AJOUTEE au catalogue gettext de Spyder par
+            # Commun/scripts/patch_spyder_add_translations.py.
+            text=_("Filter files"),
             icon=ima.icon('filter'),
             toggled=self.change_filter_state
         )
@@ -310,7 +314,9 @@ class ExplorerWidget(PluginMainWidget):
         menu = self.get_options_menu()
 
         hidden_action = self.get_action(DirViewActions.ToggleHiddenFiles)
-        for item in [hidden_action, filters_action]:
+        # SmartOS (patch_spyder_explorer_toolbar.py) : le bouton de filtre (toggle) est
+        # deplace ici, dans le menu hamburger, au lieu de la barre d'outils.
+        for item in [hidden_action, self.filter_button, filters_action]:
             self.add_item_to_menu(
                 item,
                 menu=menu,
@@ -340,9 +346,11 @@ class ExplorerWidget(PluginMainWidget):
 
         # Toolbar
         toolbar = self.get_main_toolbar()
+        # SmartOS (patch_spyder_explorer_toolbar.py) : Precedent/Suivant retires de la barre
+        # (peu utilises, ils faisaient deborder la barre dans le bouton "..."). "Selectionner un
+        # repertoire de travail" est ajoute AVANT Parent au deplacement (patch_spyder_workingdir_in_files.py)
+        # -> ordre final : Selectionner, Parent, fichier courant.
         for item in [
-            self.previous_action,
-            self.next_action,
             self.parent_action,
             self.go_to_dir_of_file_in_editor_action,
         ]:
@@ -355,7 +363,6 @@ class ExplorerWidget(PluginMainWidget):
         for action in [
             self.remote_treewidget.upload_file_action,
             self.refresh_action,
-            self.filter_button,
         ]:
             self.add_corner_widget(action, before=self._options_button)
 

@@ -173,11 +173,16 @@ class Application(SpyderPluginV2):
 
     @on_plugin_available(plugin=Plugins.Toolbar)
     def on_toolbar_available(self):
+        # SmartOS (cf. Commun/scripts/patch_spyder_file_toolbar_order.py) : ordre des boutons de la
+        # barre Fichier passe de [Nouveau, Ouvrir, Enregistrer, Tout enregistrer] a
+        # [Ouvrir, Nouveau, Enregistrer, Tout enregistrer] (demande utilisateur). Les quatre sont
+        # ajoutes before=NewCell dans la meme section : l'ordre d'affichage suit l'ordre de cette
+        # liste (cf. SpyderToolbar.add_item), il suffit donc de la reordonner.
         container = self.get_container()
         toolbar = self.get_plugin(Plugins.Toolbar)
         for action in [
-            container.new_action,
             container.open_action,
+            container.new_action,
             container.save_action,
             container.save_all_action
         ]:
@@ -265,17 +270,12 @@ class Application(SpyderPluginV2):
             screen.logicalDotsPerInchChanged.connect(
                 container.show_dpi_change_message)
 
-        # Show appeal the fifth and 25th time Spyder starts
-        spyder_runs = self.get_conf("spyder_runs_for_appeal", default=1)
-        if spyder_runs in [5, 25]:
-            QTimer.singleShot(1500, container.show_appeal)
-
-            # Increase counting in one to not get stuck at this point.
-            # Fixes spyder-ide/spyder#22457
-            self.set_conf("spyder_runs_for_appeal", spyder_runs + 1)
-        else:
-            if spyder_runs < 25:
-                self.set_conf("spyder_runs_for_appeal", spyder_runs + 1)
+        # Retrait SmartOS (_smartos_no_appeal) : Spyder ouvrait ici la fenetre d'appel aux dons
+        # ("Help keep Spyder strong") au 5e puis au 25e demarrage, en comptant dans
+        # l'option "spyder_runs_for_appeal". Demande de l'utilisateur du 09/08/2026 :
+        # qu'elle ne s'ouvre jamais toute seule. Le coeur de la barre d'etat et l'entree
+        # de menu, qui ouvrent la meme page a la demande, sont conserves.
+        # Cf. spyder_patch/patch_spyder_no_appeal_dialog.py.
 
     # ---- Private API
     # ------------------------------------------------------------------------

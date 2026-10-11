@@ -16,8 +16,8 @@ from __future__ import annotations
 import asyncio
 import json
 
-import aiohttp
-import yarl
+# Ajout SmartOS (_smartos_lazy_demarrage:aiohttp) : import differe dans les 5 fonction(s) qui s'en servent.
+# Ajout SmartOS (_smartos_lazy_demarrage:yarl) : import differe dans les 1 fonction(s) qui s'en servent.
 from packaging.version import Version
 
 from spyder.api.translations import _
@@ -41,6 +41,7 @@ class SpyderRemoteJupyterHubAPIManager(SpyderRemoteAPIManagerBase):
     def __init__(
         self, conf_id, options: JupyterHubClientOptions, _plugin=None
     ):
+        import aiohttp  # _smartos_lazy_demarrage:aiohttp
         super().__init__(conf_id, options, _plugin)
 
         self._server_url = None
@@ -58,10 +59,12 @@ class SpyderRemoteJupyterHubAPIManager(SpyderRemoteAPIManagerBase):
 
     @property
     def hub_url(self):
+        import yarl  # _smartos_lazy_demarrage:yarl
         return yarl.URL(self.options["url"])
 
     async def _start_remote_server(self):
         """Start remote server."""
+        import aiohttp  # _smartos_lazy_demarrage:aiohttp
         if not self.connected:
             self.logger.error("SSH connection is not open")
             self._emit_connection_status(
@@ -150,6 +153,7 @@ class SpyderRemoteJupyterHubAPIManager(SpyderRemoteAPIManagerBase):
 
     async def check_server_version(self) -> bool:
         """Check remote server version."""
+        import aiohttp  # _smartos_lazy_demarrage:aiohttp
         if not self.connected:
             self.logger.error("Connection is not open")
             self._emit_connection_status(
@@ -226,6 +230,7 @@ class SpyderRemoteJupyterHubAPIManager(SpyderRemoteAPIManagerBase):
 
     async def _create_new_connection(self) -> bool:
         """Create a new SSH connection."""
+        import aiohttp  # _smartos_lazy_demarrage:aiohttp
         self.logger.debug("Connecting to jupyterhub at %s", self.hub_url)
 
         if self._session is not None:
@@ -293,6 +298,7 @@ class SpyderRemoteJupyterHubAPIManager(SpyderRemoteAPIManagerBase):
         return await super().stop_remote_server()
 
     async def _heartbeat(self):
+        import aiohttp  # _smartos_lazy_demarrage:aiohttp
         while self.connected and self.server_started:
             await asyncio.sleep(30)
             try:

@@ -1453,6 +1453,17 @@ class EditorMainWidget(PluginMainWidget):
             index = self.editorstacks.index(editorstack)
             self.editorstacks.pop(index)
             self.find_widget.set_editor(self.get_current_editor())
+
+            # SmartOS (patch_spyder_editor_split_buttons.py) : Spyder ne recalcule "ce volet est-il
+            # fermable" qu'a l'ENREGISTREMENT d'un volet, jamais a son retrait - apres avoir referme
+            # une scission, le dernier volet restant gardait is_closable=True, donc un "Fermer ce
+            # volet" actif alors qu'il n'y a plus rien a fermer. Fenetre par fenetre : les volets
+            # d'une fenetre d'edition detachee ne sont pas les freres de ceux du dock.
+            for _fenetre in {_stack.window() for _stack in self.editorstacks}:
+                _freres = [_s for _s in self.editorstacks if _s.window() is _fenetre]
+                for _frere in _freres:
+                    _frere.set_closable(len(_freres) > 1)
+
             return True
         else:
             # editorstack was not removed!

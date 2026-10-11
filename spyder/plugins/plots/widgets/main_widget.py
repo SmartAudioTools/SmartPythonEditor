@@ -220,6 +220,14 @@ class PlotsWidget(ShellConnectMainWidget):
 
         # Options menu
         options_menu = self.get_options_menu()
+        # SmartOS (patch_spyder_plots_toolbar.py) : les variantes EN MASSE et la copie d'image,
+        # retirees de la barre. Section propre, declaree en premier : les sections sont rendues dans
+        # leur ordre de premiere utilisation, et separees par un trait.
+        for action in [save_all_action, copy_action, remove_all_action]:
+            self.add_item_to_menu(
+                action, menu=options_menu, section="smartos_plots_data"
+            )
+
         for action in [
             self.mute_action,
             self.outline_action,
@@ -229,12 +237,12 @@ class PlotsWidget(ShellConnectMainWidget):
 
         # Main toolbar
         main_toolbar = self.get_main_toolbar()
+        # SmartOS (patch_spyder_plots_toolbar.py) : la section Edit ne garde que le graphique
+        # COURANT (enregistrer, supprimer). Les variantes "tous les graphiques" et "Copier l'image"
+        # sont passees dans le menu burger (cf. plus haut).
         for item in [
             save_action,
-            save_all_action,
-            copy_action,
             remove_action,
-            remove_all_action,
         ]:
             self.add_item_to_toolbar(
                 item,

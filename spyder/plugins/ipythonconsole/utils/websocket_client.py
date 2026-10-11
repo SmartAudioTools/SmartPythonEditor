@@ -21,8 +21,8 @@ from functools import wraps
 from getpass import getuser
 from types import MethodType
 
-import aiohttp
-from aiohttp.client_exceptions import ClientConnectionResetError
+# Ajout SmartOS (_smartos_lazy_demarrage:aiohttp) : import differe dans les 5 fonction(s) qui s'en servent.
+# Ajout SmartOS (_smartos_lazy_demarrage:aiohttp.client_exceptions) : import differe dans les 1 fonction(s) qui s'en servent.
 from jupyter_client.adapter import adapt
 from jupyter_client.channels import major_protocol_version
 from jupyter_client.client import validate_string_dict
@@ -111,6 +111,7 @@ class _Session:
         ValueError
             If the buffers are not contiguous.
         """
+        from aiohttp.client_exceptions import ClientConnectionResetError  # _smartos_lazy_demarrage:aiohttp.client_exceptions
         buffers = msg.get("buffers", [])
 
         if self.check_pid and os.getpid() != self.pid:
@@ -186,6 +187,7 @@ class _Session:
         aiohttp.WSMessageTypeError
             If the received message is not of type WSMsgType.BINARY.
         """
+        import aiohttp  # _smartos_lazy_demarrage:aiohttp
         msg = await stream.receive(timeout=timeout)
         if msg.type in {aiohttp.WSMsgType.PING, aiohttp.WSMsgType.PONG}:
             return "hb", {msg.type: msg.data}
@@ -506,6 +508,7 @@ class _WebSocketKernelClient(Configurable):
         session_id: str | None = None,
         aiohttp_session: aiohttp.ClientSession | None = None,
     ):
+        import aiohttp  # _smartos_lazy_demarrage:aiohttp
         self._endpoint = endpoint
         self._token = token
 
@@ -673,6 +676,7 @@ class _WebSocketKernelClient(Configurable):
             self._shell_channel._inspect = None
 
     async def _connect(self):
+        import aiohttp  # _smartos_lazy_demarrage:aiohttp
         if self._aiohttp_session is None:
             self._owns_session = True
             self._aiohttp_session = aiohttp.ClientSession()
@@ -693,6 +697,7 @@ class _WebSocketKernelClient(Configurable):
 
     async def _receiver_loop(self):
         """Receive messages from the websocket stream."""
+        import aiohttp  # _smartos_lazy_demarrage:aiohttp
         if self._ws is None:
             msg = "WebSocket connection is not established."
             raise RuntimeError(msg)
@@ -1065,6 +1070,7 @@ class SpyderWSKernelClient(QtKernelClientMixin, _WebSocketKernelClient):
 
     def _handle_receiver_exception(self, exc: BaseException):
         """Handle exceptions in the receiver loop."""
+        import aiohttp  # _smartos_lazy_demarrage:aiohttp
         if (
             isinstance(exc, aiohttp.WebSocketError)
             and exc.code == aiohttp.WSCloseCode.MESSAGE_TOO_BIG

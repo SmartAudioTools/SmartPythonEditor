@@ -1,0 +1,8 @@
+# Plages de versions des bindings Qt acceptees par Spyder 6.1.5.
+# GENERE par generate_spyder_requirements.sh - ne pas editer a la main.
+# Source : spyder/requirements.py, fonction check_qt(), du bundle officiel.
+# Format : <cle qtpy>=<nom du paquet pip>,<version mini incluse>,<version maxi exclue>
+pyqt5=PyQt5,5.15.0,5.16
+pyqt6=PyQt6,6.9.0,7.0.0
+pyside2=PySide2,5.15.0,5.16
+pyside6=PySide6,6.8.0,6.9.0

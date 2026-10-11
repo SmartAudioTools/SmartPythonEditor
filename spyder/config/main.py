@@ -116,6 +116,18 @@ DEFAULTS = [
               'cpu_usage/timeout': 2000,
               'clock/enable': False,
               'clock/timeout': 1000,
+              # Activation par widget de la barre d'etat (SmartOS,
+              # patch_spyder_statusbar_enable.py) : chaque widget honore statusbar/<ID>/enable.
+              # Defaut False = masque (l'overlay par editeur reprend ces infos) ; re-activable
+              # dans Preferences > Barre d'etat.
+              'cursor_position_status/enable': False,
+              'encoding_status/enable': False,
+              'eol_status/enable': False,
+              'vcs_status/enable': False,
+              'lsp_status/enable': False,
+              'read_write_status/enable': False,
+              'pythonenv_status/enable': False,
+              'matplotlib_status/enable': False,
               }),
             ('pythonpath_manager',
              {
@@ -235,6 +247,10 @@ DEFAULTS = [
              {
               'wrap': False,
               'wrapflag': True,
+              # Overlay d'infos de fichier (SmartOS, cf.
+              # Commun/scripts/patch_spyder_editor_file_status.py + patch_spyder_overlay_prefs.py).
+              'smartos_overlay_verbose': True,
+              'smartos_overlay_only_non_standard': False,
               'todo_list': True,
               'realtime_analysis': True,
               'realtime_analysis/timeout': 2500,

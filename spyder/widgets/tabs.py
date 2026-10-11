@@ -462,6 +462,12 @@ class BaseTabs(QTabWidget):
 
         self.set_corner_widgets(corner_widgets)
 
+        # Bouton "Browse tabs" masque (ajout SmartOS, cf.
+        # Commun/scripts/patch_spyder_dock_browse_tabs.py) : navigation entre onglets jugee
+        # inutile, retiree de tous les panneaux a onglets d'un coup (demande utilisateur).
+        if hasattr(self, "browse_button"):
+            self.browse_button.hide()
+
     def update_browse_tabs_menu(self):
         """Update browse tabs menu"""
         self.browse_tabs_menu.clear()

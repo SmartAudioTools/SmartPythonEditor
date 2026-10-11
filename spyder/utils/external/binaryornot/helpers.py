@@ -17,7 +17,6 @@ Adapted from binaryornot/helpers.py of
 `BinaryOrNot <https://github.com/audreyr/binaryornot>`_.
 """
 
-import chardet
 import logging
 
 
@@ -97,7 +96,14 @@ def is_binary_string(bytes_to_check):
     logger.debug('is_likely_binary: %(is_likely_binary)r', locals())
 
     # then check for binary for possible encoding detection with chardet
-    detected_encoding = chardet.detect(bytes_to_check)
+    # Ajout SmartOS (_smartos_lazy_demarrage:chardet-ascii) : voir
+    # patch_spyder_lazy_imports_demarrage.py.
+    if (bytes_to_check.isascii() and b'\x00' not in bytes_to_check
+            and b'\x1b' not in bytes_to_check and b'~' not in bytes_to_check):
+        detected_encoding = {'encoding': 'ascii', 'confidence': 1.0}
+    else:
+        import chardet
+        detected_encoding = chardet.detect(bytes_to_check)
     logger.debug('detected_encoding: %(detected_encoding)r', locals())
 
     # finally use all the check to decide binary or text

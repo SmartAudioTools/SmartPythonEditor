@@ -681,6 +681,47 @@ class CompletionConfigurationObserver(SpyderConfigurationObserver):
 
     def _gather_observers(self):
         """Gather all the methods decorated with `on_conf_change`."""
+        # PATCH SmartOS [SmartOS pyside611-signaux-completion] (26/07/2026) : meme cause et meme
+        # correctif que dans spyder/api/config/mixins.py — on cherche les methodes
+        # decorees dans les CLASSES, sans jamais lire un attribut de l'instance, sous
+        # peine de tuer tous ses signaux sous PySide6 >= 6.9.
+        _vus = set()
+        for _classe in type(self).__mro__:
+            for method_name, _attribut in list(_classe.__dict__.items()):
+                if method_name in _vus:
+                    continue
+                _fonction = getattr(_attribut, "__func__", _attribut)
+                info = getattr(_fonction, "_conf_listen", None)
+                if info is None:
+                    continue
+                _vus.add(method_name)
+                if len(info) > 1:
+                    self._multi_option_listeners |= {method_name}
+                for section, option in info:
+                    if section is None:
+                        section = 'completions'
+                        if option == '__section':
+                            option = (
+                                'provider_configuration',
+                                self.COMPLETION_PROVIDER_NAME,
+                                'values'
+                            )
+                        else:
+                            option = self._wrap_provider_option(option)
+                    section_listeners = self._configuration_listeners.get(section, {})
+                    option_listeners = section_listeners.get(option, [])
+                    option_listeners.append(method_name)
+                    section_listeners[option] = option_listeners
+                    self._configuration_listeners[section] = section_listeners
+        return
+
+        # ⚠ NE PAS SUPPRIMER CE QUI SUIT. Ce n'est pas du code mort decoratif : l'ancre
+        # remplacee INCLUT la ligne `for method_name in dir(self):`, et le corps de la
+        # boucle d'origine reste dans le fichier apres elle. Sans ce `return` suivi de la
+        # meme ligne `for`, ce corps se rattache silencieusement a la boucle precedente :
+        # le fichier compile toujours, et leve une NameError a l'execution (essaye le
+        # 26/07/2026, en croyant simplifier). Le `return` garantit qu'il n'est jamais
+        # atteint ; la ligne `for` garantit qu'il reste syntaxiquement a sa place.
         for method_name in dir(self):
             # Avoid crash at startup due to MRO
             if PYSIDE6 and method_name in {

@@ -12,7 +12,7 @@
 import socket
 
 # Third party imports
-import asyncssh
+# Ajout SmartOS (_smartos_lazy_demarrage:asyncssh) : import differe dans les 2 fonction(s) qui s'en servent.
 from qtpy.QtCore import Signal
 from qtconsole.client import QtKernelClient, QtZMQSocketChannel
 from traitlets import Type
@@ -43,6 +43,7 @@ class KernelClientTunneler:
     @AsyncDispatcher(loop="asyncssh", early_return=False)
     async def new_connection(cls, *args, **kwargs):
         """Create a new SSH connection."""
+        import asyncssh  # _smartos_lazy_demarrage:asyncssh
         return cls(
             await asyncssh.connect(*args, **kwargs, known_hosts=None),
             _close_conn_on_exit=True,
@@ -56,6 +57,7 @@ class KernelClientTunneler:
     @AsyncDispatcher(loop="asyncssh", early_return=False)
     async def forward_port(self, remote_host, remote_port):
         """Forward a port through the SSH connection."""
+        import asyncssh  # _smartos_lazy_demarrage:asyncssh
         local = self._get_free_port()
         try:
             self._port_forwarded[(remote_host, remote_port)] = (

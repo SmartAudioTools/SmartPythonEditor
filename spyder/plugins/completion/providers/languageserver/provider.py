@@ -819,6 +819,21 @@ class LanguageServerProvider(SpyderCompletionProvider):
             for fmt in formatters
         }
 
+        # PATCH SmartOS [SmartOS ruff-linter-vs-formateur] (26/07/2026) : ruff est A LA FOIS un
+        # linter et un formateur, et pylsp-ruff a deux cles DISTINCTES - `enabled` pour le lint,
+        # `formatEnabled` pour le formatage. La boucle ci-dessus ecrit le choix du FORMATEUR sur
+        # `enabled`, donc elle ECRASE plus bas (plugins['ruff'].update) le drapeau du LINTER : des
+        # que le formateur choisi n'est pas ruff, ruff cesse de linter. Et pylsp desenregistre tout
+        # greffon dont `enabled` est faux, si bien qu'avec pyflakes coupe - le reglage naturel quand
+        # on a choisi ruff - il ne reste AUCUN linter et le serveur publie une liste vide : la marge
+        # de l'editeur n'affiche plus rien.
+        # On rend donc a ruff son drapeau de lint, en portant le choix du formateur sur la cle que
+        # pylsp-ruff lit vraiment. (La cle `formatedEnabled` du dictionnaire par defaut de Spyder est
+        # une faute de frappe : elle n'est lue par personne.)
+        formatter_options['ruff'] = {
+            'formatEnabled': formatter == 'ruff',
+        }
+
         # Setting max line length for formatters.
         # Notes:
         # 1. The autopep8 plugin shares the same maxLineLength value with the

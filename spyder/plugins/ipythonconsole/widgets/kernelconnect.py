@@ -15,7 +15,7 @@ import os.path as osp
 # Third party imports
 from jupyter_client.connect import find_connection_file
 from jupyter_core.paths import jupyter_runtime_dir
-from jsonschema import ValidationError, validate as json_validate
+# Ajout SmartOS (_smartos_lazy_demarrage:jsonschema) : import differe dans les 1 fonction(s) qui s'en servent.
 from qtpy.compat import getopenfilename
 from qtpy.QtCore import Qt
 from qtpy.QtWidgets import (QCheckBox, QDialog, QDialogButtonBox, QGridLayout,
@@ -252,6 +252,7 @@ class KernelConnectionDialog(QDialog, SpyderConfigurationAccessor):
             pass
 
     def _validate_connection_file(self):
+        from jsonschema import ValidationError, validate as json_validate  # _smartos_lazy_demarrage:jsonschema
         cf_path = osp.dirname(self.cf.text())
         cf_filename = osp.basename(self.cf.text())
 

@@ -25,7 +25,6 @@ import time
 import errno
 
 # Third-party imports
-import chardet
 
 # Local imports
 from spyder.utils.external.binaryornot.check import is_binary
@@ -115,6 +114,7 @@ CODECS = [
 
 
 def get_coding(text, force_chardet=False, default_codec=None):
+    # _smartos_lazy_import : import deplace ici, cf. Commun/scripts/patch_spyder_lazy_imports.py
     """
     Function to get the coding of a text.
 
@@ -149,6 +149,12 @@ def get_coding(text, force_chardet=False, default_codec=None):
     # Fallback using chardet
     if isinstance(text, bytes) and (force_chardet or default_codec is None):
         # Use detect because it's thread-safe since Chardet 7.0
+        # Ajout SmartOS (_smartos_lazy_demarrage:chardet-ascii) : voir
+        # patch_spyder_lazy_imports_demarrage.py.
+        if (text and text.isascii() and b'\x00' not in text
+                and b'\x1b' not in text and b'~' not in text):
+            return 'ascii'
+        import chardet
         result = chardet.detect(text)
         return result['encoding']
 

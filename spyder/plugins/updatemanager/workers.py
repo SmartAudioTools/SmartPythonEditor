@@ -23,8 +23,8 @@ from zipfile import ZipFile
 # Third party imports
 from packaging.version import parse, Version
 from qtpy.QtCore import QObject, Signal
-import requests
-from requests.exceptions import ConnectionError, HTTPError, SSLError
+# Ajout SmartOS (_smartos_lazy_demarrage:requests) : import differe dans les 4 fonction(s) qui s'en servent.
+# Ajout SmartOS (_smartos_lazy_demarrage:requests.exceptions) : import differe dans les 3 fonction(s) qui s'en servent.
 from spyder_kernels.utils.pythonenv import is_conda_env
 
 # Local imports
@@ -121,6 +121,7 @@ def get_github_releases(
     releases : dict[packaging.version.Version, dict]
         Dictionary of release information.
     """
+    import requests  # _smartos_lazy_demarrage:requests
     url = "https://api.github.com/repos/{}/releases".format(
         "spyder-ide/spyder-updater" if updater else "spyder-ide/spyder"
     )
@@ -400,6 +401,8 @@ class WorkerUpdate(BaseWorker):
 
     def start(self):
         """Main method of the worker."""
+        from requests.exceptions import ConnectionError, HTTPError, SSLError  # _smartos_lazy_demarrage:requests.exceptions
+        import requests  # _smartos_lazy_demarrage:requests
         url = None
         if not is_conda_based_app():
             self.channel = "pypi"  # Default channel if not conda
@@ -524,6 +527,7 @@ class WorkerUpdateUpdater(BaseWorker):
 
     def _download_asset(self):
         """Download Updater lock file"""
+        import requests  # _smartos_lazy_demarrage:requests
         self.installer_path = osp.join(
             get_temp_dir(),
             "updates",
@@ -662,6 +666,7 @@ class WorkerUpdateUpdater(BaseWorker):
     def start(self):
         """Main method of the worker."""
 
+        from requests.exceptions import ConnectionError, HTTPError, SSLError  # _smartos_lazy_demarrage:requests.exceptions
         try:
             self._check_asset_available()
             if (
@@ -754,6 +759,7 @@ class WorkerDownloadInstaller(BaseWorker):
 
     def _download_installer(self):
         """Donwload Spyder installer."""
+        import requests  # _smartos_lazy_demarrage:requests
         url = self.asset_info["url"]
         logger.info(f"Downloading {url} to {self.installer_path}")
 
@@ -791,6 +797,7 @@ class WorkerDownloadInstaller(BaseWorker):
 
     def start(self):
         """Main method of the worker."""
+        from requests.exceptions import ConnectionError, HTTPError, SSLError  # _smartos_lazy_demarrage:requests.exceptions
         try:
             self._download_installer()
         except UpdateDownloadCancelledException:

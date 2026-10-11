@@ -17,6 +17,7 @@ from spyder.api.plugins import Plugins, SpyderPluginV2
 from spyder.api.plugin_registration.decorators import (
     on_plugin_available, on_plugin_teardown)
 from spyder.api.translations import _
+from spyder.api.config.decorators import on_conf_change
 from spyder.api.widgets.status import StatusBarWidget
 from spyder.config.base import running_under_pytest
 from spyder.plugins.statusbar.confpage import StatusBarConfigPage
@@ -97,6 +98,10 @@ class StatusBar(SpyderPluginV2):
         container.sig_show_status_bar_requested.connect(
             self.show_status_bar
         )
+        # SmartOS (patch_spyder_statusbar_enable.py) : activation par widget de la barre d'etat.
+        container.sig_status_widget_enable_requested.connect(
+            self._smartos_apply_status_enable
+        )
 
     # ---- Public API
     def add_status_widget(self, widget, position=StatusBarWidgetPosition.Left):
@@ -145,6 +150,11 @@ class StatusBar(SpyderPluginV2):
                 StatusBarWidgetPosition.Left, widget)
         self._statusbar.layout().setContentsMargins(0, 0, 0, 0)
         self._statusbar.layout().setSpacing(0)
+        # SmartOS (patch_spyder_statusbar_enable.py) : appliquer l'activation par widget des
+        # l'ajout - y compris pour les widgets ajoutes APRES _organize_status_widgets (ex.
+        # lsp_status, a la connexion du serveur de langage), qui echapperaient sinon au
+        # gate de disposition d'add_status_widget.
+        widget.setVisible(self._smartos_status_enabled(id_))
 
     def remove_status_widget(self, id_):
         """
@@ -212,6 +222,44 @@ class StatusBar(SpyderPluginV2):
     def clock_status(self):
         return self.get_container().clock_status
 
+    # ---- Activation par widget de la barre d'etat (SmartOS, patch_spyder_statusbar_enable.py)
+    def _smartos_status_enabled(self, id_):
+        """Vrai si le widget <id_> de la barre d'etat doit etre visible, d'apres l'option
+        statusbar/<id_>/enable. Defaut True pour tout widget non gere par SmartOS (update_manager,
+        inapp_appeal, mem/cpu/heure...) : aucun impact sur eux."""
+        return bool(self.get_conf(f"{id_}/enable", True))
+
+    def _smartos_apply_status_enable(self, id_, value):
+        """Applique en direct (sans redemarrage) l'activation d'un widget de la barre d'etat,
+        puis montre la barre d'etat s'il reste au moins un widget actif, la masque sinon."""
+        if id_ in self.STATUS_WIDGETS:
+            self.STATUS_WIDGETS[id_].setVisible(bool(value))
+        self._smartos_refresh_status_bar_visibility()
+
+    def _smartos_refresh_status_bar_visibility(self):
+        """Barre d'etat visible SSI au moins un de ses widgets est active (demande utilisateur :
+        la barre suit la selection des widgets, pas de bascule separee)."""
+        options = [
+            "memory_usage/enable", "cpu_usage/enable", "clock/enable",
+            "cursor_position_status/enable", "encoding_status/enable",
+            "eol_status/enable", "vcs_status/enable", "lsp_status/enable",
+            "read_write_status/enable", "pythonenv_status/enable",
+            "matplotlib_status/enable",
+        ]
+        self._statusbar.setVisible(any(self.get_conf(o, False) for o in options))
+
+    @on_conf_change(option="memory_usage/enable")
+    def _smartos_on_mem_enable(self, value):
+        self._smartos_refresh_status_bar_visibility()
+
+    @on_conf_change(option="cpu_usage/enable")
+    def _smartos_on_cpu_enable(self, value):
+        self._smartos_refresh_status_bar_visibility()
+
+    @on_conf_change(option="clock/enable")
+    def _smartos_on_clock_enable(self, value):
+        self._smartos_refresh_status_bar_visibility()
+
     # ---- Private API
     @property
     def _statusbar(self):
@@ -254,17 +302,24 @@ class StatusBar(SpyderPluginV2):
                 self._statusbar.insertPermanentWidget(
                     StatusBarWidgetPosition.Left, self.INTERNAL_WIDGETS[id_]
                 )
-                self.INTERNAL_WIDGETS[id_].setVisible(True)
+                self.INTERNAL_WIDGETS[id_].setVisible(
+                    self._smartos_status_enabled(id_)
+                )
 
         # Add the external left widgets
         for id_ in external_left:
             self._statusbar.insertPermanentWidget(
                 StatusBarWidgetPosition.Left, self.EXTERNAL_LEFT_WIDGETS[id_]
             )
-            self.EXTERNAL_LEFT_WIDGETS[id_].setVisible(True)
+            self.EXTERNAL_LEFT_WIDGETS[id_].setVisible(
+                self._smartos_status_enabled(id_)
+            )
 
     def before_mainwindow_visible(self):
         """Perform actions before the mainwindow is visible"""
         # Organize widgets in the expected order
         self._statusbar.setVisible(False)
         self._organize_status_widgets()
+        # SmartOS : auto-visibilite initiale de la barre d'etat (patch_spyder_statusbar_enable.py)
+        # -> visible SSI au moins un widget est active (elle suit la selection des widgets).
+        self._smartos_refresh_status_bar_visibility()

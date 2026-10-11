@@ -15,7 +15,7 @@ import os
 import posixpath
 from datetime import datetime
 
-from aiohttp.client_exceptions import ClientResponseError
+# Ajout SmartOS (_smartos_lazy_demarrage:aiohttp.client_exceptions) : import differe dans les 1 fonction(s) qui s'en servent.
 from qtpy.compat import getexistingdirectory, getopenfilenames
 from qtpy.QtCore import QSortFilterProxyModel, Qt, Signal
 from qtpy.QtGui import (
@@ -569,6 +569,7 @@ class RemoteExplorer(QWidget, SpyderWidgetMixin):
     def _on_remote_download_file(
         self, future, remote_filename, local_directory, is_file
     ):
+        from aiohttp.client_exceptions import ClientResponseError  # _smartos_lazy_demarrage:aiohttp.client_exceptions
         download_error = False
         try:
             data = future.result()

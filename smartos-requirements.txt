@@ -1,0 +1,80 @@
+aiohttp==3.14.1
+asyncssh==2.23.0
+bcrypt==5.0.0
+chardet==6.0.0.post1
+cloudpickle==3.1.2
+cookiecutter==2.7.1
+diff-match-patch==20241021
+importlib_metadata==9.0.0
+intervaltree==3.1.0
+ipython==9.15.0
+ipython_pygments_lexers==1.1.1
+jedi==0.19.2
+jellyfish==1.2.1
+jsonschema==4.26.0
+keyring==25.7.0
+markdown-it-py==4.2.0
+nbconvert==7.17.1
+numpydoc==1.10.0
+packaging==26.2
+parso==0.8.7
+pexpect==4.9.0
+pickleshare==0.7.5
+psutil==7.2.2
+PyGithub==2.9.1
+Pygments==2.20.0
+pylint==4.0.6
+pylint-venv==3.0.4
+pyls-spyder==0.4.0
+python-lsp-black==2.0.0
+python-lsp-ruff==2.3.1
+python-lsp-server==1.14.0
+pyuca==1.2
+pyxdg==0.28
+pyzmq==27.1.0
+QDarkStyle==3.2.3
+qstylizer==0.2.4
+QtAwesome==1.4.2
+qtconsole==5.7.2
+QtPy==2.4.3
+rtree==1.4.1
+Sphinx==9.1.0
+.
+spyder-kernels==3.1.5
+superqt==0.8.0
+textdistance==4.6.3
+three-merge==0.1.1
+watchdog==6.0.0
+yarl==1.24.2
+pylsp-mypy==0.8.0
+# Moteur de jeu retro, requis par le plugin Spyder "Pyxel" (docks jeu + editeur de
+# ressources, cf. Commun/spyder_plugins/spyder_pyxel). Installe dans le venv de Spyder
+# et non ailleurs parce que c'est cet interpreteur qui execute les jeux depuis le dock,
+# et que c'est aussi celui de la console IPython : un jeu se comporte donc pareil qu'il
+# soit lance depuis le dock ou depuis la console.
+pyxel==2.9.8
+setproctitle==1.3.7
+spyder-line-profiler==0.4.2
+# Fork SmartOS de line_profiler (branche par defaut du depot). Le module amont arme ses
+# evenements de line-tracing sys.monitoring en GLOBAL des qu'un profileur est actif, ce qui
+# ralentit x7 a x9 TOUT le programme et pas seulement les fonctions marquees ; le fork les
+# arme PAR OBJET-CODE (x1,00 sur le code non profile, mesure), et optimise le chemin chaud.
+# Il porte aussi le marqueur SMARTOS_LOCAL_EVENTS attendu par lp_launcher.py du plugin
+# spyder_line_profiler_targets, qui sait ainsi qu'il n'a pas a re-scoper lui-meme.
+#
+# line_profiler n'est PAS une dependance directe de spyder : il arrive par
+# spyder-line-profiler ci-dessus, qui prendrait la 5.0.2 nue de PyPI. Cette ligne, etant une
+# reference directe, a la priorite dans la resolution de pip et la remplace.
+#
+# En HTTPS et non en SSH : le venv doit pouvoir se construire sur une machine ou la cle du
+# depot n'est pas deployee. Et par URL plutot qu'en editable sur /DATA/Python/FORKS, pour
+# que le venv de Spyder reste fige et reproductible - l'editable, lui, reste reserve a
+# requirements_SmartPython.in, ou le clone local EST l'arbre de developpement.
+line_profiler @ git+https://github.com/SmartAudioTools/line_profiler.git@smartos-optimisations
+# Binding Qt, directement dans les requirements (08/08/2026, demande utilisateur) : la
+# plage vient du check_qt() officiel (cf. qt_bindings_Spyder-6.1.5.txt). Le setup.py du
+# fork declare la meme chose (patch_spyder_pyside6_deps) - cette ligne fige la VERSION
+# resolue au meme titre que le reste de la pile. aarch64 : PyQt6, aucune roue PySide6.
+PySide6>=6.8.0,<6.9.0; platform_machine != "aarch64"
+PyQt6>=6.5,<7; platform_machine == "aarch64"
+PyQt6-WebEngine>=6.5,<7; platform_machine == "aarch64"

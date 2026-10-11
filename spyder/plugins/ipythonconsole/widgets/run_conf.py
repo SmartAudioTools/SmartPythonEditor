@@ -91,7 +91,8 @@ class IPythonConfigOptions(RunExecutorConfigurationGroup):
     @staticmethod
     def get_default_configuration() -> dict:
         return {
-            'current': True,
+            # SmartOS (patch_spyder_dedicated_console_default.py) : dediee par defaut - decision de l'utilisateur du 01/08/2026, cf. TODO - Spyder - General.txt.
+            'current': False,
             'post_mortem': False,
             'python_args_enabled': False,
             'python_args': '',

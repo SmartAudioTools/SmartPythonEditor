@@ -41,6 +41,21 @@ def check_qt():
     try:
         import qtpy
         package_name, required_ver = qt_infos[qtpy.API]
+
+        # Ajout SmartOS (_smartos_qt_version_override) : permet d'outrepasser la plage de
+        # version figee en dur ci-dessus via des variables d'environnement, sans avoir a
+        # repatcher ce fichier a chaque nouvelle version de binding Qt testee. Cf.
+        # Commun/scripts/patch_spyder_qt_version_override.py
+        import os as _smartos_os
+        if _smartos_os.environ.get("SPYDER_QT_SKIP_VERSION_CHECK") == "1":
+            return
+        _smartos_min = _smartos_os.environ.get("SPYDER_QT_MIN_VERSION")
+        _smartos_max = _smartos_os.environ.get("SPYDER_QT_MAX_VERSION")
+        if _smartos_min or _smartos_max:
+            required_ver = (
+                _smartos_min or required_ver[0],
+                _smartos_max or required_ver[1],
+            )
         actual_ver = qtpy.QT_VERSION
 
         if actual_ver is None or not (

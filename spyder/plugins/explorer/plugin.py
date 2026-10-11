@@ -240,6 +240,70 @@ class Explorer(SpyderDockablePlugin):
             self._chdir_from_working_directory
         )
 
+    def on_mainwindow_visible(self):
+        # SmartOS (patch_spyder_workingdir_in_files v3) : reorganiser le haut du dock Fichiers.
+        # Travail DIFFERE via QTimer.singleShot(0) pour passer APRES tous les on_mainwindow_visible
+        # synchrones (dont celui du plugin Toolbar qui pose la barre "repertoire courant" dans la
+        # fenetre) -> sinon la barre serait reprise juste apres notre deplacement.
+        super().on_mainwindow_visible()
+        from qtpy.QtCore import QTimer
+        QTimer.singleShot(0, self._smartos_reorg_files_dock)
+
+    def _smartos_reorg_files_dock(self):
+        # Voir on_mainwindow_visible. Tout sous try/except : un echec laisse les barres en place
+        # plutot que de casser le demarrage de Spyder pour une retouche cosmetique.
+        try:
+            wd = self.get_plugin(Plugins.WorkingDirectory, error=False)
+            if wd is None:
+                return
+            container = wd.get_container()
+            toolbar = getattr(container, "toolbar", None)            # barre "repertoire courant" (combo)
+            browse_action = getattr(container, "browse_action", None)
+            main = self.get_main()
+            widget = self.get_widget()
+            layout = getattr(widget, "_toolbars_layout", None)
+            if toolbar is None or main is None or layout is None:
+                return
+
+            # 1. "Selectionner un repertoire de travail" dans la barre de l'Explorer, AVANT "Parent"
+            #    -> ordre : Selectionner, Parent, fichier courant.
+            if browse_action is not None:
+                try:
+                    ex_toolbar = widget.get_main_toolbar()
+                    if "browse_action" not in getattr(ex_toolbar, "_item_map", {}):
+                        ex_toolbar.add_item(browse_action, before="parent_action")
+                        # add_item ne redessine pas : on reconstruit la barre proprement.
+                        ex_toolbar.clear()
+                        ex_toolbar.render()
+                except Exception:
+                    pass
+
+            # 2. Barre "repertoire courant" (combo) sortie de la fenetre et posee SOUS la barre de
+            #    l'Explorer (les boutons au-dessus du combo).
+            main.removeToolBar(toolbar)
+            toolbar.setMovable(False)
+            toolbar.setFloatable(False)
+            if layout.indexOf(toolbar) == -1:
+                layout.addWidget(toolbar)
+            toolbar.setVisible(True)
+
+            # 3. Le combo doit REMPLIR la largeur du dock. Dans l'ancienne barre d'outils, un spacer
+            #    extensible (WorkingDirectorySpacer) poussait le contenu a droite ; reste dans la
+            #    barre migree, il occupe l'espace et le combo garde sa taille naturelle. On retire ce
+            #    spacer et on rend le combo extensible horizontalement.
+            try:
+                from qtpy.QtWidgets import QSizePolicy
+                pathedit = getattr(container, "pathedit", None)
+                if pathedit is not None:
+                    pathedit.setSizePolicy(
+                        QSizePolicy.Expanding, QSizePolicy.Preferred
+                    )
+                toolbar.remove_item("working_directory_spacer")
+            except Exception:
+                pass
+        except Exception:
+            pass
+
     @on_plugin_available(plugin=Plugins.Application)
     def on_application_available(self):
         application = self.get_plugin(Plugins.Application)

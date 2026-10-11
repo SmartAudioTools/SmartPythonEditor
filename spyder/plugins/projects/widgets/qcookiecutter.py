@@ -14,7 +14,7 @@ import sys
 import tempfile
 from collections import OrderedDict
 
-from jinja2 import Template
+# Ajout SmartOS (_smartos_lazy_demarrage:jinja2) : import differe dans les 3 fonction(s) qui s'en servent.
 from qtpy import QtCore
 from qtpy import QtWidgets
 
@@ -146,6 +146,7 @@ class CookiecutterWidget(QtWidgets.QWidget):
         """
         Check which values are Jinja2 expressions.
         """
+        from jinja2 import Template  # _smartos_lazy_demarrage:jinja2
         if self._cookiecutter_settings:
             # https://cookiecutter.readthedocs.io/en/latest/advanced/template_extensions.html
             self._extensions = self._cookiecutter_settings.pop("_extensions",
@@ -328,6 +329,7 @@ class CookiecutterWidget(QtWidgets.QWidget):
         """
         Render text that contains Jinja2 expressions and set their values.
         """
+        from jinja2 import Template  # _smartos_lazy_demarrage:jinja2
         cookiecutter_settings = self.get_values()
         for setting, value in self._rendered_settings.items():
             if not setting.startswith(("__", "_")):
@@ -362,6 +364,7 @@ class CookiecutterWidget(QtWidgets.QWidget):
         """
         Run, pre generation script and provide information on finished.
         """
+        from jinja2 import Template  # _smartos_lazy_demarrage:jinja2
         if self._pre_gen_code is not None:
             cookiecutter_settings = self.get_values()
             template = Template(self._pre_gen_code)

@@ -223,17 +223,29 @@ class PydocBrowser(PluginMainWidget):
         refresh_action = self.get_action(WebViewActions.Refresh)
 
         # Toolbar
+        # SmartOS (patch_spyder_onlinehelp_toolbar.py) : la barre garde la navigation reelle, la
+        # barre d'adresse et la recherche. "Accueil" et les deux zooms partent dans le menu burger
+        # (cf. juste apres) - le menu burger de ce dock etait vide, il ne contenait que les quatre
+        # actions de dock ajoutees d'office par PluginMainWidget.
         toolbar = self.get_main_toolbar()
         for item in [self.get_action(WebViewActions.Back),
                      self.get_action(WebViewActions.Forward), refresh_action,
-                     stop_action, home_action, self.label, self.url_combo,
-                     self.get_action(WebViewActions.ZoomIn),
-                     self.get_action(WebViewActions.ZoomOut), find_action,
+                     stop_action, self.label, self.url_combo, find_action,
                      ]:
             self.add_item_to_toolbar(
                 item,
                 toolbar=toolbar,
                 section=PydocBrowserMainToolbarSections.Main,
+            )
+
+        options_menu = self.get_options_menu()
+        for item in [home_action,
+                     self.get_action(WebViewActions.ZoomIn),
+                     self.get_action(WebViewActions.ZoomOut)]:
+            self.add_item_to_menu(
+                item,
+                menu=options_menu,
+                section="smartos_onlinehelp_view",
             )
 
         # Signals

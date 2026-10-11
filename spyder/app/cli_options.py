@@ -168,6 +168,48 @@ def get_options(argv=None):
         )
     )
 
+    # Ajout SmartOS (_smartos_run_file) : executer un script au demarrage, sans frappe
+    # clavier. Cf. Commun/scripts/patch_spyder_run_file.py
+    parser.add_argument(
+        '-r', '--run-file',
+        type=str,
+        dest="run_file",
+        default=None,
+        help="Ouvrir ce fichier et l'executer dans la console au demarrage"
+    )
+
+    # Ajout SmartOS (_smartos_profile_file) : profiler un fichier au demarrage, sans clic.
+    # Cf. Commun/scripts/patch_spyder_profile_file.py
+    parser.add_argument(
+        '--profile-file',
+        type=str,
+        dest="profile_file",
+        default=None,
+        help="Ouvrir ce fichier et lancer le profilage combine au demarrage"
+    )
+
+    # Ajout SmartOS (_smartos_gui_exec) : executer un script dans le processus GUI au
+    # demarrage, sans frappe. Cf. Commun/scripts/patch_spyder_gui_exec.py
+    parser.add_argument(
+        '--gui-exec',
+        type=str,
+        dest="gui_exec",
+        default=None,
+        help="Executer ce script Python dans le processus GUI au demarrage "
+             "(namespace : main, app)"
+    )
+
+    # Ajout SmartOS (_smartos_actions) : jouer un scenario d'actions au demarrage, sans
+    # clic ni frappe. Cf. Commun/scripts/patch_spyder_actions.py
+    parser.add_argument(
+        '--actions',
+        type=str,
+        dest="actions",
+        default=None,
+        help="Jouer ce scenario JSON au demarrage (ouvrir, profiler, attendre, capturer, "
+             "fermer) et ecrire un rapport"
+    )
+
     parser.add_argument('files', nargs='*')
     options = parser.parse_args(argv)
     args = options.files

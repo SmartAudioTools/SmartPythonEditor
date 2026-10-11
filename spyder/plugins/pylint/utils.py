@@ -15,13 +15,15 @@ import os.path as osp
 # Third party imports
 # This is necessary to avoid a crash at startup
 # Fixes spyder-ide/spyder#20079
-try:
-    from pylint import config as pylint_config
-except Exception:
-    pylint_config = None
+# Ajout SmartOS (_smartos_lazy_demarrage:pylint) : import differe dans
+# _find_pylintrc_path.
 
 
 def _find_pylintrc_path(path):
+    try:
+        from pylint import config as pylint_config
+    except Exception:
+        pylint_config = None
     if pylint_config is not None:
         os.chdir(path)
         for p in pylint_config.find_default_config_files():

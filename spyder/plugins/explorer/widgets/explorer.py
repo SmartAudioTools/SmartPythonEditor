@@ -69,9 +69,12 @@ from spyder.utils.misc import getcwd_or_home
 from spyder.utils.qthelpers import (
     file_uri, keyevent_to_keysequence_str, start_file)
 
+# Ajout SmartOS (_smartos_lazy_demarrage:nbconvert) : temoin de presence seulement,
+# l'import reel est fait par convert_notebook.
 try:
-    from nbconvert import PythonExporter as nbexporter
-except:
+    import importlib.util
+    nbexporter = importlib.util.find_spec('nbconvert')
+except Exception:
     nbexporter = None    # analysis:ignore
 
 
@@ -1801,7 +1804,8 @@ class DirView(QTreeView, SpyderWidgetMixin):
     def convert_notebook(self, fname):
         """Convert an IPython notebook to a Python script in editor"""
         try:
-            script = nbexporter().from_filename(fname)[0]
+            from nbconvert import PythonExporter
+            script = PythonExporter().from_filename(fname)[0]
         except Exception as e:
             QMessageBox.critical(
                 self, _('Conversion error'),

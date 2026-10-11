@@ -218,8 +218,8 @@ def create_splash_screen(use_previous_factor=False):
     if not running_under_pytest():
         # This is a good size for the splash screen image at a scale factor of
         # 1. It corresponds to 75 ppi and preserves its aspect ratio.
-        width = 526
-        height = 432
+        width = 526   # [SmartOS splash-size] canevas aligne sur le ratio du splash SmartPythonEditor
+        height = 340  # [SmartOS splash-size] (1560x1009 -> 526x340) ; cf. patch_spyder_splash_size.py
 
         # This allows us to use the previous scale factor for the splash screen
         # shown when Spyder is restarted. Otherwise, it appears pixelated.

@@ -230,7 +230,10 @@ class KernelComm(CommBase, QObject):
                 if not self.kernel_client.is_alive():
                     raise RuntimeError("Kernel is dead")
                 raise TimeoutError(timeout_msg)
-            wait_loop.exec_()
+            # Ajout SmartOS (_smartos_attente_noyau_fermeture) : exec() rend -1 sans tourner
+            # quand l'application quitte ; sans cette sortie, la boucle ne finit jamais.
+            if wait_loop.exec_() == -1:
+                raise RuntimeError("Application is quitting")
 
         wait_timeout.stop()
         signal.disconnect(wait_loop.quit)

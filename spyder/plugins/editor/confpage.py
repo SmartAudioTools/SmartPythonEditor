@@ -497,6 +497,23 @@ class EditorConfigPage(PluginConfigPage, SpyderConfigurationObserver):
         mouse_shortcuts_layout.addWidget(mouse_shortcuts_button)
         mouse_shortcuts_group.setLayout(mouse_shortcuts_layout)
 
+        # -- Infos du fichier : options de l'overlay bas de l'editeur (SmartOS, cf.
+        # Commun/scripts/patch_spyder_editor_file_status.py). Libelles ecrits directement en
+        # francais (version destinee a des etudiants).
+        smartos_overlay_group = QGroupBox("Infos du fichier (bas de l'editeur)")
+        smartos_overlay_verbose_box = newcb(
+            "Libelles detailles (ex. \u00ab Ligne 11, Colonne 1, encodage UTF-8, fin de ligne "
+            "Unix \u00bb) plutot qu'abreges (\u00ab L 11, C 1  UTF-8  LF \u00bb)",
+            'smartos_overlay_verbose')
+        smartos_overlay_only_ns_box = newcb(
+            "N'afficher l'encodage et la fin de ligne que s'ils ne sont pas standard "
+            "(autre chose qu'UTF-8 / Unix)",
+            'smartos_overlay_only_non_standard')
+        smartos_overlay_layout = QVBoxLayout()
+        smartos_overlay_layout.addWidget(smartos_overlay_verbose_box)
+        smartos_overlay_layout.addWidget(smartos_overlay_only_ns_box)
+        smartos_overlay_group.setLayout(smartos_overlay_layout)
+
         # --- Tabs ---
         self.create_tab(
             _("Display"),
@@ -504,6 +521,7 @@ class EditorConfigPage(PluginConfigPage, SpyderConfigurationObserver):
                 interface_group,
                 helpers_group,
                 highlight_group,
+                smartos_overlay_group,
             ],
         )
 

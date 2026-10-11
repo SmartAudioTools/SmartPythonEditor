@@ -106,8 +106,10 @@ def set_color_scheme(name, color_scheme, replace=True):
         value = CONF.get(section, option, default=None)
         if value is None or replace or name not in names:
             CONF.set(section, option, color_scheme[key])
-    names.append(str(name))
-    CONF.set(section, "names", sorted(list(set(names))))
+    # Ajout SmartOS (_smartos_lazy_demarrage:noms-themes) : ecrit seulement si la liste change.
+    _smartos_noms = sorted(set(names + [str(name)]))
+    if _smartos_noms != names:
+        CONF.set(section, "names", _smartos_noms)
 
 
 def set_default_color_scheme(name, replace=True):

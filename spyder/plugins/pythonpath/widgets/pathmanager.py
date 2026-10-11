@@ -28,7 +28,7 @@ from qtpy.QtWidgets import (
     QStackedWidget,
     QVBoxLayout,
 )
-from requests.structures import CaseInsensitiveDict
+# Ajout SmartOS (_smartos_lazy_demarrage:requests.structures) : import differe dans les 1 fonction(s) qui s'en servent.
 
 # Local imports
 from spyder.api.asyncdispatcher import AsyncDispatcher
@@ -392,6 +392,7 @@ class PathManager(QDialog, SpyderWidgetMixin):
         paths in the PYTHONPATH Manager and the system paths reflect the
         exported paths, retaining their active state.
         """
+        from requests.structures import CaseInsensitiveDict  # _smartos_lazy_demarrage:requests.structures
         answer = QMessageBox.question(
             self,
             _("Export"),

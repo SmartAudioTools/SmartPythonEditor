@@ -210,6 +210,14 @@ class _SpyderComboBoxMixin:
 
         # Style
         self._css = self._generate_stylesheet()
+        # SmartOS (_smartos_combobox_feuille) : la feuille « liste fermee » des la construction,
+        # pour que les hidePopup() que Qt appelle a l'initialisation n'aient rien a reposer.
+        # Reserve a SpyderComboBox : la liste des polices, qui partage ce constructeur, ne les pose pas.
+        if not sys.platform == "darwin" and isinstance(self, SpyderComboBox):
+            self._css.QComboBox.setValues(
+                borderBottomLeftRadius=SpyderPalette.SIZE_BORDER_RADIUS,
+                borderBottomRightRadius=SpyderPalette.SIZE_BORDER_RADIUS,
+            )
         self.setStyleSheet(self._css.toString())
 
         style = _SpyderComboBoxProxyStyle(None)
@@ -388,7 +396,9 @@ class SpyderComboBox(_SpyderComboBoxMixin, QComboBox):
                 borderBottomRightRadius=SpyderPalette.SIZE_BORDER_RADIUS,
             )
 
-            self.setStyleSheet(self._css.toString())
+            _smartos_feuille = self._css.toString()  # SmartOS (_smartos_combobox_feuille)
+            if _smartos_feuille != self.styleSheet():
+                self.setStyleSheet(_smartos_feuille)
 
 
 class SpyderComboBoxWithIcons(SpyderComboBox):

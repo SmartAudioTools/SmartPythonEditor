@@ -65,7 +65,7 @@ class RecoveryDialog(QDialog):
 
         # This is needed because of an error in MacOS.
         # See https://bugreports.qt.io/browse/QTBUG-49576
-        if parent and hasattr(parent, 'splash'):
+        if parent and getattr(parent, 'splash', None) is not None:  # [SmartOS splash-off-recover]
             self.splash = parent.splash
             self.splash.hide()
         else:

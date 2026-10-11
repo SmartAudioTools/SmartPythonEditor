@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from http import HTTPStatus
 
-import aiohttp
+# Ajout SmartOS (_smartos_lazy_demarrage:aiohttp) : import differe dans les 1 fonction(s) qui s'en servent.
 
 from spyder.plugins.remoteclient import SPYDER_PLUGIN_NAME
 from spyder.plugins.remoteclient.api.manager.base import (
@@ -57,6 +57,7 @@ class SpyderRemoteEnvironAPI(SpyderBaseJupyterAPI):
         SpyderRemoteAPIError
             If the API call fails.
         """
+        import aiohttp  # _smartos_lazy_demarrage:aiohttp
         try:
             async with self.session.get(self.api_url / name) as response:
                 return await response.text()

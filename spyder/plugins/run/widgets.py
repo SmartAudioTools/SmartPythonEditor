@@ -846,7 +846,16 @@ class RunDialog(BaseRunConfigDialog, SpyderFontsMixin):
         params = stored_params["params"]
         working_dir_params = params['working_dir']
         exec_params = params['executor_params']
-        self.current_widget.set_configuration(exec_params)
+        # [SmartOS run-params-guard] : un jeu de parametres enregistre pour un AUTRE
+        # executeur n'a pas les memes cles que le widget affiche, et set_configuration lit ces
+        # cles sans defaut (KeyError: 'current' en lancant un profilage, 25/07/2026). Meme
+        # garde que dans select_context ci-dessus ; a formes divergentes, on montre les valeurs
+        # par defaut du widget plutot que de laisser a l'ecran celles du jeu precedent.
+        _smartos_defauts = self.current_widget.get_default_configuration()
+        if exec_params.keys() == _smartos_defauts.keys():
+            self.current_widget.set_configuration(exec_params)
+        else:
+            self.current_widget.set_configuration(_smartos_defauts)
 
         source = working_dir_params['source']
         path = working_dir_params['path']

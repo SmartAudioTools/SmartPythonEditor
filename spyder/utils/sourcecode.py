@@ -14,7 +14,15 @@ import os
 import sys
 
 # Third-part imports
-from pylsp._utils import get_eol_chars as _get_eol_chars
+# Ajout SmartOS (_smartos_lazy_demarrage:pylsp-eol) : copie de
+# pylsp._utils.get_eol_chars, voir patch_spyder_lazy_imports_demarrage.py.
+_SMARTOS_EOL_REGEX = re.compile('(\r\n|\r|\n)')
+
+
+def _get_eol_chars(text):
+    match = _SMARTOS_EOL_REGEX.search(text)
+    return match.group(0) if match else None
+
 
 # Order is important:
 EOL_CHARS = (("\r\n", 'nt'), ("\n", 'posix'), ("\r", 'mac'))
